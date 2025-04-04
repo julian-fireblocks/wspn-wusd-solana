@@ -1,6 +1,5 @@
 use crate::error::WusdError;
 use crate::state::{AccessRegistryState, FreezeState, MintState, PauseState, PermitState};
-use crate::utils::require_has_access;
 use anchor_lang::prelude::*;
 use anchor_spl::token_2022::{self, transfer_checked, Token2022};
 use anchor_spl::token_interface::TokenAccount;
@@ -19,14 +18,12 @@ pub fn transfer(ctx: Context<Transfer>, amount: u64) -> Result<()> {
     );
     require!(!ctx.accounts.to_token.is_frozen(), WusdError::AccountFrozen);
 
-    // 检查访问权限
-    require_has_access(
-        ctx.accounts.from.key(),
-        true,
-        Some(amount),
-        &ctx.accounts.pause_state,
-        Some(&ctx.accounts.access_registry),
-    )?;
+    // 检查访问权限 - 允许用户转移自己的代币
+    // 验证系统未暂停状态
+    ctx.accounts.pause_state.validate_not_paused()?;
+
+    // 验证金额大于0
+    require!(amount > 0, WusdError::InvalidAmount);
 
     // 执行转账
     transfer_checked(
@@ -75,14 +72,12 @@ pub fn transfer_from(ctx: Context<TransferFrom>, amount: u64) -> Result<()> {
         WusdError::InvalidOwner
     );
 
-    // 检查访问权限
-    require_has_access(
-        ctx.accounts.spender.key(),
-        true,
-        Some(amount),
-        &ctx.accounts.pause_state,
-        Some(&ctx.accounts.access_registry),
-    )?;
+    // 检查访问权限 - 允许任何被授权的用户使用transfer_from功能
+    // 验证系统未暂停状态
+    ctx.accounts.pause_state.validate_not_paused()?;
+
+    // 验证金额大于0
+    require!(amount > 0, WusdError::InvalidAmount);
 
     // 检查冻结状态
     require!(
@@ -101,7 +96,7 @@ pub fn transfer_from(ctx: Context<TransferFrom>, amount: u64) -> Result<()> {
                 mint: ctx.accounts.token_mint.to_account_info(),
                 to: ctx.accounts.to_token.to_account_info(),
                 authority: ctx.accounts.spender.to_account_info(), // 使用spender作为authority
-            }
+            },
         ),
         amount,
         6, // 使用固定的小数位数
