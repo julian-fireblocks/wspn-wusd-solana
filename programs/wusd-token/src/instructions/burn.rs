@@ -1,9 +1,10 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_2022::Token2022;
 use anchor_spl::token_2022::{self, burn as token_burn};
-use crate::access::AccessLevel;
+// 删除未使用的导入
 use crate::error::WusdError;
-use crate::state::{AuthorityState, MintState, AccessRegistryState, PauseState};
+use crate::state::{AuthorityState, MintState, AccessRegistryState, PauseState, FreezeState};
+use crate::utils::require_has_access;
 
 /// 销毁WUSD代币
 /// * `ctx` - 销毁上下文
@@ -24,14 +25,17 @@ pub fn burn(ctx: Context<Burn>, amount: u64) -> Result<()> {
         WusdError::InvalidOwner
     );
 
+    // 验证账户未被冻结
+    ctx.accounts.freeze_state.check_frozen()?;
+
     // 验证访问权限
-    require!(
-        ctx.accounts.access_registry.has_access(
-            ctx.accounts.authority.key(),
-            AccessLevel::Debit
-        ),
-        WusdError::AccessDenied
-    );
+    require_has_access(
+        ctx.accounts.authority.key(),
+        true, // 销毁是借记操作
+        Some(amount),
+        &ctx.accounts.pause_state,
+        Some(&ctx.accounts.access_registry),
+    )?;
 
     // 验证余额充足
     require!(
@@ -70,12 +74,30 @@ pub struct Burn<'info> {
     pub authority: Signer<'info>,
     #[account(mut)]
     pub mint: Box<InterfaceAccount<'info, anchor_spl::token_interface::Mint>>,
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = token_account.owner == authority.key() @ WusdError::InvalidOwner,
+        constraint = token_account.mint == mint.key() @ WusdError::InvalidMint
+    )]
     pub token_account: Box<InterfaceAccount<'info, anchor_spl::token_interface::TokenAccount>>,
     pub token_program: Program<'info, Token2022>, 
     pub mint_state: Account<'info, MintState>,
+    #[account(
+        seeds = [b"pause_state", mint.key().as_ref()],
+        bump,
+    )]
     pub pause_state: Account<'info, PauseState>,
-    pub access_registry: Account<'info, AccessRegistryState>, 
+    #[account(
+        seeds = [b"access_registry"],
+        bump,
+    )]
+    pub access_registry: Account<'info, AccessRegistryState>,
+    #[account(
+        seeds = [b"freeze", token_account.key().as_ref()],
+        bump,
+        constraint = !freeze_state.is_frozen @ WusdError::AccountFrozen
+    )]
+    pub freeze_state: Account<'info, FreezeState>,
 } 
 
 /// 销毁事件，记录代币销毁的详细信息

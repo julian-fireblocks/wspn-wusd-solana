@@ -59,6 +59,8 @@ pub mod wusd_token {
         let (_authority_pda, bump) = Pubkey::find_program_address(seeds, ctx.program_id);
         let _bump_bytes = &[bump];
 
+        // 转移mint_tokens权限给authority_state PDA
+        // 转移mint_tokens权限给authority_state PDA
         token_2022::set_authority(
             CpiContext::new(
                 ctx.accounts.token_program.to_account_info(),
@@ -68,6 +70,32 @@ pub mod wusd_token {
                 }
             ),
             AuthorityType::MintTokens,
+            Some(ctx.accounts.authority_state.key()),
+        )?;
+        
+        // 转移freeze_account权限给authority_state PDA
+        token_2022::set_authority(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                token_2022::SetAuthority {
+                    current_authority: ctx.accounts.authority.to_account_info(),
+                    account_or_mint: ctx.accounts.token_mint.to_account_info(),
+                }
+            ),
+            AuthorityType::FreezeAccount,
+            Some(ctx.accounts.authority_state.key()),
+        )?;
+        
+        // 转移freeze_account权限给authority_state PDA
+        token_2022::set_authority(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                token_2022::SetAuthority {
+                    current_authority: ctx.accounts.authority.to_account_info(),
+                    account_or_mint: ctx.accounts.token_mint.to_account_info(),
+                }
+            ),
+            AuthorityType::FreezeAccount,
             Some(ctx.accounts.authority_state.key()),
         )?;
 
@@ -107,6 +135,8 @@ pub mod wusd_token {
         let (_authority_pda, bump) = Pubkey::find_program_address(seeds, ctx.program_id);
         let _bump_bytes = &[bump];
 
+        // 转移mint_tokens权限给authority_state PDA
+        // 转移mint_tokens权限给authority_state PDA
         token_2022::set_authority(
             CpiContext::new(
                 ctx.accounts.token_program.to_account_info(),
@@ -116,6 +146,32 @@ pub mod wusd_token {
                 }
             ),
             AuthorityType::MintTokens,
+            Some(ctx.accounts.authority_state.key()),
+        )?;
+        
+        // 转移freeze_account权限给authority_state PDA
+        token_2022::set_authority(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                token_2022::SetAuthority {
+                    current_authority: ctx.accounts.authority.to_account_info(),
+                    account_or_mint: ctx.accounts.token_mint.to_account_info(),
+                }
+            ),
+            AuthorityType::FreezeAccount,
+            Some(ctx.accounts.authority_state.key()),
+        )?;
+        
+        // 转移freeze_account权限给authority_state PDA
+        token_2022::set_authority(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                token_2022::SetAuthority {
+                    current_authority: ctx.accounts.authority.to_account_info(),
+                    account_or_mint: ctx.accounts.token_mint.to_account_info(),
+                }
+            ),
+            AuthorityType::FreezeAccount,
             Some(ctx.accounts.authority_state.key()),
         )?;
 

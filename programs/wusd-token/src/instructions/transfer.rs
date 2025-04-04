@@ -1,5 +1,6 @@
 use crate::error::WusdError;
 use crate::state::{AccessRegistryState, FreezeState, MintState, PauseState, PermitState};
+use crate::access::AccessLevel;
 use anchor_lang::prelude::*;
 use anchor_spl::token_2022::{self, transfer_checked, Token2022};
 use anchor_spl::token_interface::TokenAccount;
@@ -11,19 +12,18 @@ pub fn transfer(ctx: Context<Transfer>, amount: u64) -> Result<()> {
     // 验证系统未被暂停
     ctx.accounts.pause_state.validate_not_paused()?;
     require!(amount > 0, WusdError::InvalidAmount);
-    // 检查冻结状态
+    
+    // 检查冻结状态 - 通过账户约束已经验证
+    // 验证from_token和to_token的所有者 - 通过账户约束已经验证
+    
+    // 验证访问权限
     require!(
-        !ctx.accounts.from_token.is_frozen(),
-        WusdError::AccountFrozen
+        ctx.accounts.access_registry.has_access(
+            ctx.accounts.from.key(),
+            AccessLevel::Debit
+        ),
+        WusdError::AccessDenied
     );
-    require!(!ctx.accounts.to_token.is_frozen(), WusdError::AccountFrozen);
-
-    // 检查访问权限 - 允许用户转移自己的代币
-    // 验证系统未暂停状态
-    ctx.accounts.pause_state.validate_not_paused()?;
-
-    // 验证金额大于0
-    require!(amount > 0, WusdError::InvalidAmount);
 
     // 执行转账
     transfer_checked(
@@ -37,7 +37,7 @@ pub fn transfer(ctx: Context<Transfer>, amount: u64) -> Result<()> {
             },
         ),
         amount,
-        6, // 使用固定的小数位数
+        ctx.accounts.token_mint.decimals, // 使用token_mint中的小数位数
     )?;
 
     // 发送转账事件
@@ -66,28 +66,26 @@ pub fn transfer_from(ctx: Context<TransferFrom>, amount: u64) -> Result<()> {
         WusdError::InsufficientAllowance
     );
 
-    // 验证 token account 所有权
-    require!(
-        ctx.accounts.from_token.owner == ctx.accounts.owner.key(),
-        WusdError::InvalidOwner
-    );
-
-    // 检查访问权限 - 允许任何被授权的用户使用transfer_from功能
+    // 验证 token account 所有权 - 通过账户约束已经验证
+    
     // 验证系统未暂停状态
     ctx.accounts.pause_state.validate_not_paused()?;
 
     // 验证金额大于0
     require!(amount > 0, WusdError::InvalidAmount);
 
-    // 检查冻结状态
+    // 检查冻结状态 - 通过账户约束已经验证
+    
+    // 验证访问权限
     require!(
-        !ctx.accounts.from_token.is_frozen(),
-        WusdError::AccountFrozen
+        ctx.accounts.access_registry.has_access(
+            ctx.accounts.spender.key(),
+            AccessLevel::Debit
+        ),
+        WusdError::AccessDenied
     );
-    require!(!ctx.accounts.to_token.is_frozen(), WusdError::AccountFrozen);
 
     // 直接使用spender作为authority执行转账
-    // 不再尝试使用PDA签名，而是使用标准的Token2022 approve/transfer机制
     transfer_checked(
         CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
@@ -99,7 +97,7 @@ pub fn transfer_from(ctx: Context<TransferFrom>, amount: u64) -> Result<()> {
             },
         ),
         amount,
-        6, // 使用固定的小数位数
+        ctx.accounts.token_mint.decimals, // 使用token_mint中的小数位数
     )?;
 
     // 更新授权额度
@@ -109,6 +107,18 @@ pub fn transfer_from(ctx: Context<TransferFrom>, amount: u64) -> Result<()> {
         .amount
         .checked_sub(amount)
         .ok_or(WusdError::InsufficientAllowance)?;
+        
+    // 发送转账事件
+    let clock = Clock::get()?;
+    emit!(TransferEvent {
+        from: ctx.accounts.owner.key(),
+        to: ctx.accounts.to_token.owner,
+        amount: amount,
+        fee: 0,
+        timestamp: clock.unix_timestamp,
+        memo: Some(format!("Transfer by {}", ctx.accounts.spender.key())),
+    });
+    
     Ok(())
 }
 

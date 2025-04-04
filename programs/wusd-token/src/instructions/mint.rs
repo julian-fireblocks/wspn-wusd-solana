@@ -20,6 +20,12 @@ pub fn mint(ctx: Context<MintAccounts>, amount: u64, bump: u8) -> Result<()> {
         Some(&ctx.accounts.access_registry),
     )?;
 
+    // 验证mint权限是否正确设置为authority_state PDA
+    require!(
+        ctx.accounts.token_mint.mint_authority.contains(&ctx.accounts.authority_state.key()),
+        WusdError::Unauthorized
+    );
+
     // 执行铸币
     let mint_key = ctx.accounts.token_mint.key();
     let seeds = &[b"authority", mint_key.as_ref(), &[bump]];
@@ -36,6 +42,13 @@ pub fn mint(ctx: Context<MintAccounts>, amount: u64, bump: u8) -> Result<()> {
         amount
     )?;
 
+    // 发出铸币事件
+    emit!(MintEvent {
+        minter: ctx.accounts.authority.key(),
+        recipient: ctx.accounts.token_account.owner,
+        amount
+    });
+
     Ok(())
 }
 
@@ -49,11 +62,26 @@ pub struct MintAccounts<'info> {
     #[account(mut)]
     pub token_account: InterfaceAccount<'info, anchor_spl::token_interface::TokenAccount>,
     pub token_program: Program<'info, Token2022>,
-    #[account(mut)]
+    #[account(
+        mut,
+        seeds = [b"authority", token_mint.key().as_ref()],
+        bump
+    )]
     pub authority_state: Account<'info, AuthorityState>,
     #[account(mut)]
     pub mint_state: Account<'info, MintState>,
     #[account(mut)]
     pub pause_state: Account<'info, PauseState>,
     pub access_registry: Account<'info, AccessRegistryState>,
+}
+
+/// 铸币事件，记录代币铸造的详细信息
+#[event]
+pub struct MintEvent {
+    /// 铸币者地址，执行铸币操作的账户
+    pub minter: Pubkey,
+    /// 接收者地址，接收铸造代币的账户
+    pub recipient: Pubkey,
+    /// 铸造数量，被铸造的代币数量
+    pub amount: u64,
 }
