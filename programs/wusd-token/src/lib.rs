@@ -1,15 +1,15 @@
-//! WUSD Token 程序 
-use anchor_lang::prelude::*;
-use anchor_spl::token_2022; 
-use anchor_spl::token_interface::Mint;
-use anchor_spl::token_2022::ID as TOKEN_PROGRAM_ID;
-use spl_token_2022::instruction::AuthorityType;   
-
-mod instructions; 
+//! WUSD Token 程序  
 mod error;
 mod state; 
 mod utils;
 mod access;
+mod instructions; 
+
+use anchor_lang::prelude::*;
+use anchor_spl::token_2022; 
+use anchor_spl::token_interface::Mint;
+use anchor_spl::token_2022::ID as TOKEN_PROGRAM_ID;
+use spl_token_2022::instruction::AuthorityType;    
 
 use state::{AuthorityState, MintState, PauseState, AccessRegistryState};
 
@@ -57,10 +57,7 @@ pub mod wusd_token {
         let mint_key = ctx.accounts.token_mint.key();
         let seeds = &[b"authority", mint_key.as_ref()]; 
         let (_authority_pda, bump) = Pubkey::find_program_address(seeds, ctx.program_id);
-        let _bump_bytes = &[bump];
-
-        // 转移mint_tokens权限给authority_state PDA
-        // 转移mint_tokens权限给authority_state PDA
+        let _bump_bytes = &[bump]; 
         token_2022::set_authority(
             CpiContext::new(
                 ctx.accounts.token_program.to_account_info(),
@@ -133,10 +130,7 @@ pub mod wusd_token {
         let mint_key = ctx.accounts.token_mint.key();
         let seeds = &[b"authority", mint_key.as_ref()]; 
         let (_authority_pda, bump) = Pubkey::find_program_address(seeds, ctx.program_id);
-        let _bump_bytes = &[bump];
-
-        // 转移mint_tokens权限给authority_state PDA
-        // 转移mint_tokens权限给authority_state PDA
+        let _bump_bytes = &[bump];  
         token_2022::set_authority(
             CpiContext::new(
                 ctx.accounts.token_program.to_account_info(),
