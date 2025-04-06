@@ -45,7 +45,7 @@ pub fn transfer(ctx: Context<Transfer>, amount: u64) -> Result<()> {
         from_bytes: ctx.accounts.from.key().to_bytes(),
         to_bytes: ctx.accounts.to.key().to_bytes(),
         amount,
-        fee: 0,
+        fee: 0, 
         timestamp: Clock::get()?.unix_timestamp,
         has_memo: false,
         spender_bytes: [0; 32], // 使用全0字节数组表示没有spender
@@ -114,7 +114,7 @@ pub fn transfer_from(ctx: Context<TransferFrom>, amount: u64) -> Result<()> {
         from_bytes: ctx.accounts.owner.key().to_bytes(),
         to_bytes: ctx.accounts.to_token.owner.to_bytes(),
         amount,
-        fee: 0,
+        fee: 0, 
         timestamp: Clock::get()?.unix_timestamp,
         has_memo: true,
         spender_bytes: ctx.accounts.spender.key().to_bytes(),
@@ -231,7 +231,7 @@ pub struct TransferEvent {
     // 使用字节数组代替Pubkey，减少栈使用
     pub from_bytes: [u8; 32],
     pub to_bytes: [u8; 32],
-git    pub amount: u64,
+    pub amount: u64,
     pub fee: u64,
     pub timestamp: i64,
     // 使用布尔值代替字符串，减少栈使用
