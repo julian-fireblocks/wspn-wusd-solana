@@ -37,14 +37,24 @@ pub struct ManageOperator<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
 
-    #[account(constraint = authority_state.is_admin(authority.key()))]
+    #[account(
+        constraint = authority_state.is_admin(authority.key()) @ WusdError::Unauthorized,
+        seeds = [b"authority", token_mint.key().as_ref()],
+        bump
+    )]
     pub authority_state: Account<'info, AuthorityState>,
 
     /// CHECK: 仅用于记录地址
     pub operator: AccountInfo<'info>,
 
-    #[account(mut)]
+    #[account(
+        mut,
+        seeds = [b"access_registry"],
+        bump,
+        constraint = access_registry.initialized @ WusdError::AccessRegistryNotInitialized
+    )]
     pub access_registry: Account<'info, AccessRegistryState>,
 
+    pub token_mint: InterfaceAccount<'info, anchor_spl::token_interface::Mint>,
     pub system_program: Program<'info, System>,
-} 
+}

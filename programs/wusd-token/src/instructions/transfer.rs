@@ -131,7 +131,8 @@ pub struct TransferFrom<'info> {
     pub owner: AccountInfo<'info>,
     #[account(
         mut,
-        constraint = from_token.owner == owner.key()
+        constraint = from_token.owner == owner.key() @ WusdError::InvalidOwner,
+        constraint = from_token.mint == to_token.mint @ WusdError::InvalidMint
     )]
     pub from_token: Box<InterfaceAccount<'info, anchor_spl::token_interface::TokenAccount>>,
     #[account(mut)]
@@ -149,7 +150,17 @@ pub struct TransferFrom<'info> {
     pub permit: Account<'info, PermitState>,
     #[account(mut)]
     pub mint_state: Box<Account<'info, MintState>>,
+    #[account(
+        seeds = [b"pause_state", token_mint.key().as_ref()],
+        bump,
+        constraint = !pause_state.paused @ WusdError::ContractPaused
+    )]
     pub pause_state: Account<'info, PauseState>,
+    #[account(
+        seeds = [b"access_registry"],
+        bump,
+        constraint = access_registry.initialized @ WusdError::AccessRegistryNotInitialized
+    )]
     pub access_registry: Account<'info, AccessRegistryState>,
     pub token_program: Program<'info, Token2022>,
     #[account(mut)]

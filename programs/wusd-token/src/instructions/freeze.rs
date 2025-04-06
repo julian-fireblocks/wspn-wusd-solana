@@ -99,8 +99,14 @@ pub struct FreezeAccount<'info> {
     /// CHECK: 这个账户仅用于生成PDA种子
     pub account: AccountInfo<'info>,
 
+    #[account(
+        constraint = authority_state.is_admin(authority.key()) @ WusdError::Unauthorized,
+        seeds = [b"authority", token_mint.key().as_ref()],
+        bump
+    )]
     pub authority_state: Account<'info, AuthorityState>,
 
+    pub token_mint: InterfaceAccount<'info, anchor_spl::token_interface::Mint>,
     pub token_program: Program<'info, Token2022>,
     pub system_program: Program<'info, System>,
 }
@@ -123,7 +129,15 @@ pub struct UnfreezeAccount<'info> {
     /// CHECK: 这个账户仅用于生成PDA种子
     pub account: AccountInfo<'info>,
 
+    #[account(
+        constraint = authority_state.is_admin(authority.key()) @ WusdError::Unauthorized,
+        seeds = [b"authority", token_mint.key().as_ref()],
+        bump
+    )]
     pub authority_state: Account<'info, AuthorityState>,
+    
+    pub token_mint: InterfaceAccount<'info, anchor_spl::token_interface::Mint>,
+    pub system_program: Program<'info, System>,
 } 
 
 #[event]

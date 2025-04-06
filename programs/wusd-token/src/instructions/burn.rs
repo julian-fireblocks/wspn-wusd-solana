@@ -66,7 +66,11 @@ pub fn burn(ctx: Context<Burn>, amount: u64) -> Result<()> {
 
 #[derive(Accounts)]
 pub struct Burn<'info> {
-    #[account(mut)]
+    #[account(
+        mut,
+        seeds = [b"authority", mint.key().as_ref()],
+        bump
+    )]
     pub authority_state: Account<'info, AuthorityState>, 
     #[account(mut)]
     pub mint_authority: Signer<'info>,
@@ -85,11 +89,13 @@ pub struct Burn<'info> {
     #[account(
         seeds = [b"pause_state", mint.key().as_ref()],
         bump,
+        constraint = !pause_state.paused @ WusdError::ContractPaused
     )]
     pub pause_state: Account<'info, PauseState>,
     #[account(
         seeds = [b"access_registry"],
         bump,
+        constraint = access_registry.initialized @ WusdError::AccessRegistryNotInitialized
     )]
     pub access_registry: Account<'info, AccessRegistryState>,
     #[account(

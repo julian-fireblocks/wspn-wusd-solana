@@ -65,14 +65,30 @@ pub struct MintAccounts<'info> {
     #[account(
         mut,
         seeds = [b"authority", token_mint.key().as_ref()],
-        bump
+        bump,
+        constraint = authority_state.is_minter(authority.key()) @ WusdError::NotMinter
     )]
     pub authority_state: Account<'info, AuthorityState>,
-    #[account(mut)]
+    #[account(
+        mut,
+        seeds = [b"mint_state", token_mint.key().as_ref()],
+        bump
+    )]
     pub mint_state: Account<'info, MintState>,
-    #[account(mut)]
+    #[account(
+        mut,
+        seeds = [b"pause_state", token_mint.key().as_ref()],
+        bump,
+        constraint = !pause_state.paused @ WusdError::ContractPaused
+    )]
     pub pause_state: Account<'info, PauseState>,
+    #[account(
+        seeds = [b"access_registry"],
+        bump,
+        constraint = access_registry.initialized @ WusdError::AccessRegistryNotInitialized
+    )]
     pub access_registry: Account<'info, AccessRegistryState>,
+    pub system_program: Program<'info, System>,
 }
 
 /// 铸币事件，记录代币铸造的详细信息
