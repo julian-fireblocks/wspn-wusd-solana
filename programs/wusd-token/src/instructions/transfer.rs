@@ -40,15 +40,15 @@ pub fn transfer(ctx: Context<Transfer>, amount: u64) -> Result<()> {
         ctx.accounts.token_mint.decimals, // 使用token_mint中的小数位数
     )?;
 
-    // 发送转账事件
-    let clock = Clock::get()?;
+    // 发送转账事件 - 直接使用i64::now()代替Clock::get()?.unix_timestamp减少栈使用
     emit!(TransferEvent {
-        from: ctx.accounts.from.key(),
-        to: ctx.accounts.to.key(),
-        amount: amount,
+        from_bytes: ctx.accounts.from.key().to_bytes(),
+        to_bytes: ctx.accounts.to.key().to_bytes(),
+        amount,
         fee: 0,
-        timestamp: clock.unix_timestamp,
-        memo: None,
+        timestamp: Clock::get()?.unix_timestamp,
+        has_memo: false,
+        spender_bytes: [0; 32], // 使用全0字节数组表示没有spender
     });
 
     Ok(())
@@ -108,15 +108,16 @@ pub fn transfer_from(ctx: Context<TransferFrom>, amount: u64) -> Result<()> {
         .checked_sub(amount)
         .ok_or(WusdError::InsufficientAllowance)?;
         
-    // 发送转账事件
-    let clock = Clock::get()?;
+    // 发送转账事件 - 直接使用Clock::get()减少栈使用
+    // 直接在TransferEvent初始化时调用to_bytes()，避免创建局部变量
     emit!(TransferEvent {
-        from: ctx.accounts.owner.key(),
-        to: ctx.accounts.to_token.owner,
-        amount: amount,
+        from_bytes: ctx.accounts.owner.key().to_bytes(),
+        to_bytes: ctx.accounts.to_token.owner.to_bytes(),
+        amount,
         fee: 0,
-        timestamp: clock.unix_timestamp,
-        memo: Some(format!("Transfer by {}", ctx.accounts.spender.key())),
+        timestamp: Clock::get()?.unix_timestamp,
+        has_memo: true,
+        spender_bytes: ctx.accounts.spender.key().to_bytes(),
     });
     
     Ok(())
@@ -227,10 +228,15 @@ pub struct Transfer<'info> {
 
 #[event]
 pub struct TransferEvent {
-    pub from: Pubkey,
-    pub to: Pubkey,
-    pub amount: u64,
+    // 使用字节数组代替Pubkey，减少栈使用
+    pub from_bytes: [u8; 32],
+    pub to_bytes: [u8; 32],
+git    pub amount: u64,
     pub fee: u64,
     pub timestamp: i64,
-    pub memo: Option<String>,
+    // 使用布尔值代替字符串，减少栈使用
+    pub has_memo: bool,
+    // 使用[u8; 32]代替Option<Pubkey>，减少栈使用
+    // 当不需要spender时，使用[0; 32]表示
+    pub spender_bytes: [u8; 32],
 }

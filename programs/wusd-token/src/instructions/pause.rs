@@ -9,6 +9,11 @@ pub fn pause(ctx: Context<Pause>) -> Result<()> {
         ctx.accounts.authority_state.is_pauser(ctx.accounts.authority.key()),
         WusdError::NotPauser
     );
+    // 检查当前状态是否已经是暂停状态，避免不必要的状态更新
+    if ctx.accounts.pause_state.paused {
+        msg!("Contract is already paused");
+        return Ok(());
+    }
     ctx.accounts.pause_state.set_paused(true);
     Ok(())
 }
@@ -20,6 +25,11 @@ pub fn unpause(ctx: Context<Unpause>) -> Result<()> {
         ctx.accounts.authority_state.is_pauser(ctx.accounts.authority.key()),
         WusdError::NotPauser
     );
+    // 检查当前状态是否已经是非暂停状态，避免不必要的状态更新
+    if !ctx.accounts.pause_state.paused {
+        msg!("Contract is already unpaused");
+        return Ok(());
+    }
     ctx.accounts.pause_state.set_paused(false);
     Ok(())
 }
