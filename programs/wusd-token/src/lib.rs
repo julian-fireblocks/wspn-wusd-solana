@@ -59,6 +59,9 @@ pub mod wusd_token {
             ctx.accounts.access_registry.has_access(ctx.accounts.authority.key(), crate::access::AccessLevel::Debit),
             WusdError::Unauthorized
         );
+        
+        // 验证令牌兼容性
+        crate::utils::validate_token_compatibility(&ctx.accounts.token_mint.to_account_info())?;
 
         // 1. 初始化状态账户
         let authority_state = &mut ctx.accounts.authority_state;
@@ -142,6 +145,9 @@ pub mod wusd_token {
             ctx.accounts.access_registry.has_access(ctx.accounts.authority.key(), crate::access::AccessLevel::Debit),
             WusdError::Unauthorized
         );
+        
+        // 验证令牌兼容性
+        crate::utils::validate_token_compatibility(&ctx.accounts.token_mint.to_account_info())?;
 
         // 1. 初始化状态账户
         let authority_state = &mut ctx.accounts.authority_state;

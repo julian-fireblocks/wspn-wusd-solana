@@ -2,6 +2,9 @@ use anchor_lang::prelude::*;
 use crate::access::AccessLevel;
 use crate::error::WusdError;
 use crate::state::{PauseState, AccessRegistryState}; 
+use solana_program::account_info::AccountInfo;
+use spl_token_2022::extension::{ExtensionType, StateWithExtensions, BaseStateWithExtensions};
+use spl_token_2022::state::Mint as Token2022Mint;
 
 /// 检查用户是否具有执行操作的权限
 /// 
@@ -45,5 +48,40 @@ pub fn require_has_access(
         );
     }
 
+    Ok(())
+}
+
+/// 验证令牌是否与程序兼容
+/// 
+/// # 参数
+/// * `token_mint_info` - 令牌铸币账户信息
+/// 
+/// # 错误
+/// * `WusdError::InvalidMint` - 令牌不兼容
+pub fn validate_token_compatibility<'info>(
+    token_mint_info: &AccountInfo<'info>
+) -> Result<()> {
+    // 尝试获取令牌的扩展信息
+    let mint_data = token_mint_info.try_borrow_data()?;
+    
+    // 检查令牌是否有不兼容的扩展
+    if let Ok(state) = StateWithExtensions::<Token2022Mint>::unpack(&mint_data) {
+        // 检查是否有不兼容的扩展类型
+        if state.get_extension_types()?
+            .iter()
+            .any(|ext_type| {
+                matches!(
+                    ext_type,
+                    ExtensionType::TransferFeeConfig | 
+                    ExtensionType::ConfidentialTransferMint | 
+                    ExtensionType::PermanentDelegate
+                )
+            }) 
+        {
+            msg!("Token has incompatible extension types");
+            return Err(WusdError::InvalidMint.into());
+        }
+    }
+    
     Ok(())
 }
