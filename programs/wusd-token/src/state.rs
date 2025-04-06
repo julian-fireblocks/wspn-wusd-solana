@@ -220,8 +220,7 @@ impl AccessRegistryState {
 
         // 如果是 Debit 操作（发送代币）
         if matches!(level, AccessLevel::Debit) {
-            // 允许任何用户转移自己的代币
-            // 这里不再限制只有管理员和操作员才能转移代币
+            // 允许任何用户转移自己的代币 
             return true;
         }
 

@@ -5,6 +5,7 @@ mod utils;
 mod access;
 mod instructions; 
 
+use crate::error::WusdError;
 use anchor_lang::prelude::*;
 use anchor_spl::token_2022; 
 use anchor_spl::token_interface::Mint;
@@ -27,11 +28,20 @@ declare_id!("8nBbkdsTkqbrnrbVTUxyciQNvT6Q5B3pZkPQmP3nnuwU");
 pub mod wusd_token {
     use super::*; 
     pub fn initialize_access_registry(ctx: Context<InitializeAccessRegistry>) -> Result<()> {
+        // 确保访问注册表尚未初始化
+        require!(!ctx.accounts.access_registry.initialized, WusdError::Unauthorized);
+        
         let access_registry = &mut ctx.accounts.access_registry;
         access_registry.authority = ctx.accounts.authority.key();
         access_registry.operator_count = 0;
         access_registry.operators = [Pubkey::default(); 10];
         access_registry.initialized = true;
+        
+        // 发出初始化事件
+        emit!(AccessRegistryInitializeEvent {
+            authority: ctx.accounts.authority.key()
+        });
+        
         Ok(())
     }
 
@@ -39,6 +49,16 @@ pub mod wusd_token {
         msg!("Starting initialization...");
         msg!("Authority: {}", ctx.accounts.authority.key());
         msg!("Mint: {}", ctx.accounts.token_mint.key());
+
+        // 验证访问注册表已初始化
+        require!(ctx.accounts.access_registry.initialized, WusdError::AccessRegistryNotInitialized);
+        
+        // 验证调用者是否有权限初始化
+        require!(
+            ctx.accounts.access_registry.authority == ctx.accounts.authority.key() || 
+            ctx.accounts.access_registry.has_access(ctx.accounts.authority.key(), crate::access::AccessLevel::Debit),
+            WusdError::Unauthorized
+        );
 
         // 1. 初始化状态账户
         let authority_state = &mut ctx.accounts.authority_state;
@@ -112,6 +132,16 @@ pub mod wusd_token {
         msg!("Starting PDA-only initialization...");
         msg!("Authority: {}", ctx.accounts.authority.key());
         msg!("Mint: {}", ctx.accounts.token_mint.key());
+
+        // 验证访问注册表已初始化
+        require!(ctx.accounts.access_registry.initialized, WusdError::AccessRegistryNotInitialized);
+        
+        // 验证调用者是否有权限初始化
+        require!(
+            ctx.accounts.access_registry.authority == ctx.accounts.authority.key() || 
+            ctx.accounts.access_registry.has_access(ctx.accounts.authority.key(), crate::access::AccessLevel::Debit),
+            WusdError::Unauthorized
+        );
 
         // 1. 初始化状态账户
         let authority_state = &mut ctx.accounts.authority_state;
@@ -260,7 +290,8 @@ pub struct InitializePdaOnly<'info> {
     /// 代币铸币账户 - 注意这里不使用init约束，因为账户已经存在
     #[account(
         mut,
-        owner = TOKEN_PROGRAM_ID
+        owner = TOKEN_PROGRAM_ID,
+        constraint = token_mint.mint_authority.contains(&authority.key()) @ WusdError::Unauthorized
     )]
     pub token_mint: InterfaceAccount<'info, Mint>,
     
@@ -283,6 +314,15 @@ pub struct InitializePdaOnly<'info> {
         bump
     )]
     pub pause_state: Account<'info, PauseState>,
+    
+    /// 访问注册表账户，确保已初始化
+    #[account(
+        seeds = [b"access_registry"],
+        bump,
+        constraint = access_registry.initialized @ WusdError::AccessRegistryNotInitialized
+    )]
+    pub access_registry: Account<'info, AccessRegistryState>,
+    
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, anchor_spl::token_2022::Token2022>,
     pub rent: Sysvar<'info, Rent>,
@@ -334,6 +374,15 @@ pub struct Initialize<'info> {
         bump
     )]
     pub pause_state: Account<'info, PauseState>,
+    
+    /// 访问注册表账户，确保已初始化
+    #[account(
+        seeds = [b"access_registry"],
+        bump,
+        constraint = access_registry.initialized @ WusdError::AccessRegistryNotInitialized
+    )]
+    pub access_registry: Account<'info, AccessRegistryState>,
+    
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, anchor_spl::token_2022::Token2022>,
     pub rent: Sysvar<'info, Rent>,
@@ -349,7 +398,8 @@ pub struct InitializeAccessRegistry<'info> {
         payer = authority, 
         space = AccessRegistryState::SIZE,
         seeds = [b"access_registry"],
-        bump
+        bump,
+        constraint = !access_registry.initialized @ WusdError::Unauthorized
     )]
     pub access_registry: Account<'info, AccessRegistryState>,
     pub system_program: Program<'info, System>,
@@ -360,4 +410,9 @@ pub struct InitializeEvent {
     pub authority: Pubkey,
     pub mint: Pubkey,
     pub decimals: u8,
+}
+
+#[event]
+pub struct AccessRegistryInitializeEvent {
+    pub authority: Pubkey,
 }
