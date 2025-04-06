@@ -34,7 +34,7 @@ pub mod wusd_token {
         let access_registry = &mut ctx.accounts.access_registry;
         access_registry.authority = ctx.accounts.authority.key();
         access_registry.operator_count = 0;
-        access_registry.operators = [Pubkey::default(); 10];
+        access_registry.operators = [Pubkey::default(); 5];
         access_registry.initialized = true;
         
         // 发出初始化事件

@@ -147,7 +147,7 @@ pub struct AccessRegistryState {
     /// 是否已初始化
     pub initialized: bool,
     /// 操作员列表 (使用固定大小数组代替 Vec 来避免序列化问题)
-    pub operators: [Pubkey; 10],  // 支持最多10个操作员
+    pub operators: [Pubkey; 5],  // 支持最多5个操作员，减少栈使用
     /// 当前操作员数量
     pub operator_count: u8,
 }
@@ -155,15 +155,15 @@ pub struct AccessRegistryState {
 impl AccessRegistryState {
     pub const SIZE: usize = 8 + // discriminator
         32 + // authority
-        4 + // operator_count
-        (32 * 10) + // operators array
+        1 + // operator_count
+        (32 * 5) + // operators array (减少到5个操作员)
         1; // initialized
 
     pub fn new(authority: Pubkey) -> Self {
         Self {
             authority,
             operator_count: 0,
-            operators: [Pubkey::default(); 10],
+            operators: [Pubkey::default(); 5],
             initialized: false,
         }
     }
@@ -172,7 +172,7 @@ impl AccessRegistryState {
     pub fn add_operator(&mut self, operator: Pubkey) -> Result<()> {
         // 检查是否已达到最大操作员数量
         require!(
-            self.operator_count < 10,
+            self.operator_count < 5,
             WusdError::TooManyOperators
         );
 
