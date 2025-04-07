@@ -1,5 +1,5 @@
 use crate::error::WusdError;
-use crate::state::{AccessRegistryState, FreezeState, MintState, PauseState, PermitState};
+use crate::state::{AccessRegistryState, AuthorityState, FreezeState, MintState, PauseState, PermitState};
 use crate::access::AccessLevel;
 use anchor_lang::prelude::*;
 use anchor_spl::token_2022::{self, transfer_checked, Token2022};
@@ -201,6 +201,11 @@ pub struct Transfer<'info> {
     pub token_program: Program<'info, Token2022>,
     #[account(mut)]
     pub token_mint: InterfaceAccount<'info, anchor_spl::token_interface::Mint>,
+    #[account(
+        seeds = [b"authority", token_mint.key().as_ref()],
+        bump
+    )]
+    pub authority_state: Box<Account<'info, AuthorityState>>,
     #[account(
         seeds = [b"pause_state", from_token.mint.as_ref()],
         bump,

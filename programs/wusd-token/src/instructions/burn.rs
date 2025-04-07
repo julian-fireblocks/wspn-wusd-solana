@@ -27,6 +27,13 @@ pub fn burn(ctx: Context<Burn>, amount: u64) -> Result<()> {
 
     // 验证账户未被冻结
     ctx.accounts.freeze_state.check_frozen()?;
+    
+    // 验证权限状态 - 使用authority_state
+    require!(
+        ctx.accounts.authority_state.is_admin(ctx.accounts.authority.key()) || 
+        ctx.accounts.token_account.owner == ctx.accounts.authority.key(),
+        WusdError::Unauthorized
+    );
 
     // 验证访问权限 - 简化调用，减少栈使用
     let pause_state = &ctx.accounts.pause_state;

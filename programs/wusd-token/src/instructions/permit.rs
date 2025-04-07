@@ -15,6 +15,12 @@ pub fn permit(ctx: Context<Permit>, params: PermitParams) -> Result<()> {
     // 验证基本参数
     require!(params.amount > 0, WusdError::InvalidAmount);
     
+    // 验证mint状态
+    require!(
+        ctx.accounts.mint_state.mint == ctx.accounts.token_program.key(),
+        WusdError::InvalidMint
+    );
+    
     // 初始化 permit_state
     ctx.accounts.permit_state.set_inner(PermitState::initialize(
         ctx.accounts.owner.key(),

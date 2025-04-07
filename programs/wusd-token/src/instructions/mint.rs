@@ -14,6 +14,12 @@ pub fn mint(ctx: Context<MintAccounts>, amount: u64, bump: u8) -> Result<()> {
         return Err(error!(WusdError::ContractPaused));
     }
     
+    // 验证调用者是否有铸币权限
+    require!(
+        ctx.accounts.authority_state.is_minter(ctx.accounts.authority.key()),
+        WusdError::Unauthorized
+    );
+    
     // 执行铸币 - 极简化CPI调用
     let mint_key = ctx.accounts.token_mint.key();
     let seeds = &[b"authority", mint_key.as_ref(), &[bump]];
