@@ -28,13 +28,15 @@ pub fn burn(ctx: Context<Burn>, amount: u64) -> Result<()> {
     // 验证账户未被冻结
     ctx.accounts.freeze_state.check_frozen()?;
 
-    // 验证访问权限
+    // 验证访问权限 - 简化调用，减少栈使用
+    let pause_state = &ctx.accounts.pause_state;
+    let access_registry = &ctx.accounts.access_registry;
     require_has_access(
         ctx.accounts.authority.key(),
         true, // 销毁是借记操作
         Some(amount),
-        &ctx.accounts.pause_state,
-        Some(&ctx.accounts.access_registry),
+        pause_state,
+        Some(access_registry),
     )?;
 
     // 验证余额充足
@@ -71,7 +73,7 @@ pub struct Burn<'info> {
         seeds = [b"authority", mint.key().as_ref()],
         bump
     )]
-    pub authority_state: Box<Account<'info, AuthorityState>>, 
+    pub authority_state: Account<'info, AuthorityState>, 
     #[account(mut)]
     pub mint_authority: Signer<'info>,
     #[account(mut)]
@@ -83,27 +85,27 @@ pub struct Burn<'info> {
         constraint = token_account.owner == authority.key() @ WusdError::InvalidOwner,
         constraint = token_account.mint == mint.key() @ WusdError::InvalidMint
     )]
-    pub token_account: Box<InterfaceAccount<'info, anchor_spl::token_interface::TokenAccount>>,
+    pub token_account: InterfaceAccount<'info, anchor_spl::token_interface::TokenAccount>,
     pub token_program: Program<'info, Token2022>, 
-    pub mint_state: Box<Account<'info, MintState>>,
+    pub mint_state: Account<'info, MintState>,
     #[account(
         seeds = [b"pause_state", mint.key().as_ref()],
         bump,
         constraint = !pause_state.paused @ WusdError::ContractPaused
     )]
-    pub pause_state: Box<Account<'info, PauseState>>,
+    pub pause_state: Account<'info, PauseState>,
     #[account(
         seeds = [b"access_registry"],
         bump,
         constraint = access_registry.initialized @ WusdError::AccessRegistryNotInitialized
     )]
-    pub access_registry: Box<Account<'info, AccessRegistryState>>,
+    pub access_registry: Account<'info, AccessRegistryState>,
     #[account(
         seeds = [b"freeze", token_account.key().as_ref()],
         bump,
         constraint = !freeze_state.is_frozen @ WusdError::AccountFrozen
     )]
-    pub freeze_state: Box<Account<'info, FreezeState>>,
+    pub freeze_state: Account<'info, FreezeState>,
 } 
 
 /// 销毁事件，记录代币销毁的详细信息

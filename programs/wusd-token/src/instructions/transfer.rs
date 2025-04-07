@@ -40,15 +40,15 @@ pub fn transfer(ctx: Context<Transfer>, amount: u64) -> Result<()> {
         ctx.accounts.token_mint.decimals, // 使用token_mint中的小数位数
     )?;
 
-    // 发送转账事件 - 直接使用i64::now()代替Clock::get()?.unix_timestamp减少栈使用
+    // 发送转账事件 - 使用更简洁的方式处理Pubkey，减少栈使用
     emit!(TransferEvent {
-        from_bytes: ctx.accounts.from.key().to_bytes(),
-        to_bytes: ctx.accounts.to.key().to_bytes(),
+        from: ctx.accounts.from.key(),
+        to: ctx.accounts.to.key(),
         amount,
         fee: 0, 
         timestamp: Clock::get()?.unix_timestamp,
         has_memo: false,
-        spender_bytes: [0; 32], // 使用全0字节数组表示没有spender
+        spender: None, // 使用Option<Pubkey>代替字节数组
     });
 
     Ok(())
@@ -108,16 +108,15 @@ pub fn transfer_from(ctx: Context<TransferFrom>, amount: u64) -> Result<()> {
         .checked_sub(amount)
         .ok_or(WusdError::InsufficientAllowance)?;
         
-    // 发送转账事件 - 直接使用Clock::get()减少栈使用
-    // 直接在TransferEvent初始化时调用to_bytes()，避免创建局部变量
+    // 发送转账事件 - 使用更简洁的方式处理Pubkey，减少栈使用
     emit!(TransferEvent {
-        from_bytes: ctx.accounts.owner.key().to_bytes(),
-        to_bytes: ctx.accounts.to_token.owner.to_bytes(),
+        from: ctx.accounts.owner.key(),
+        to: ctx.accounts.to_token.owner,
         amount,
         fee: 0, 
         timestamp: Clock::get()?.unix_timestamp,
         has_memo: true,
-        spender_bytes: ctx.accounts.spender.key().to_bytes(),
+        spender: Some(ctx.accounts.spender.key()),
     });
     
     Ok(())
@@ -228,15 +227,14 @@ pub struct Transfer<'info> {
 
 #[event]
 pub struct TransferEvent {
-    // 使用字节数组代替Pubkey，减少栈使用
-    pub from_bytes: [u8; 32],
-    pub to_bytes: [u8; 32],
+    // 直接使用Pubkey类型，避免不必要的转换
+    pub from: Pubkey,
+    pub to: Pubkey,
     pub amount: u64,
     pub fee: u64,
     pub timestamp: i64,
     // 使用布尔值代替字符串，减少栈使用
     pub has_memo: bool,
-    // 使用[u8; 32]代替Option<Pubkey>，减少栈使用
-    // 当不需要spender时，使用[0; 32]表示
-    pub spender_bytes: [u8; 32],
+    // 使用Option<Pubkey>代替字节数组，更符合Rust习惯且减少栈使用
+    pub spender: Option<Pubkey>,
 }
