@@ -41,7 +41,7 @@ fn initialize_state_accounts(
     pause_state.paused = false;
 }
 
-// 辅助函数：转移权限，减少栈使用
+// 辅助函数：转移权限，极度简化以减少栈使用
 #[inline(always)]
 fn transfer_authorities<'info>(
     token_program: &Program<'info, anchor_spl::token_2022::Token2022>,
@@ -49,35 +49,33 @@ fn transfer_authorities<'info>(
     token_mint: &InterfaceAccount<'info, Mint>,
     authority_state: &Account<'info, AuthorityState>,
 ) -> Result<()> {
-    let auth_state_key = authority_state.key();
-    let token_program_info = token_program.to_account_info();
-    let authority_info = authority.to_account_info();
-    let token_mint_info = token_mint.to_account_info();
+    // 极简化实现，减少局部变量和中间对象创建
+    let auth_key = authority_state.key();
     
-    // 转移mint权限
+    // 转移mint权限 - 直接使用to_account_info()而不存储中间变量
     token_2022::set_authority(
         CpiContext::new(
-            token_program_info.clone(),
+            token_program.to_account_info(),
             token_2022::SetAuthority {
-                current_authority: authority_info.clone(),
-                account_or_mint: token_mint_info.clone(),
+                current_authority: authority.to_account_info(),
+                account_or_mint: token_mint.to_account_info(),
             }
         ),
         AuthorityType::MintTokens,
-        Some(auth_state_key),
+        Some(auth_key),
     )?;
     
-    // 转移freeze权限
+    // 转移freeze权限 - 直接使用to_account_info()而不存储中间变量
     token_2022::set_authority(
         CpiContext::new(
-            token_program_info,
+            token_program.to_account_info(),
             token_2022::SetAuthority {
-                current_authority: authority_info,
-                account_or_mint: token_mint_info,
+                current_authority: authority.to_account_info(),
+                account_or_mint: token_mint.to_account_info(),
             }
         ),
         AuthorityType::FreezeAccount,
-        Some(auth_state_key),
+        Some(auth_key),
     )?;
     
     Ok(())
@@ -248,7 +246,7 @@ pub struct InitializePdaOnly<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
 
-    /// 权限管理账户 - 简化约束条件
+    /// 权限管理账户 - 极简化约束条件
     #[account(
         init,
         payer = authority, 
@@ -256,13 +254,13 @@ pub struct InitializePdaOnly<'info> {
         seeds = [b"authority", token_mint.key().as_ref()],
         bump
     )]
-    pub authority_state: Box<Account<'info, AuthorityState>>,
+    pub authority_state: Account<'info, AuthorityState>,
 
     /// 代币铸币账户 - 极简化约束条件
     #[account(mut)]
     pub token_mint: InterfaceAccount<'info, Mint>,
     
-    /// 铸币状态账户 - 简化约束条件
+    /// 铸币状态账户 - 极简化约束条件
     #[account(
         init,
         payer = authority, 
@@ -270,9 +268,9 @@ pub struct InitializePdaOnly<'info> {
         seeds = [b"mint_state", token_mint.key().as_ref()],
         bump
     )]
-    pub mint_state: Box<Account<'info, MintState>>,
+    pub mint_state: Account<'info, MintState>,
 
-    /// 暂停状态账户 - 简化约束条件
+    /// 暂停状态账户 - 极简化约束条件
     #[account(
         init,
         payer = authority, 
@@ -280,11 +278,11 @@ pub struct InitializePdaOnly<'info> {
         seeds = [b"pause_state", token_mint.key().as_ref()],
         bump
     )]
-    pub pause_state: Box<Account<'info, PauseState>>,
+    pub pause_state: Account<'info, PauseState>,
     
     /// 访问注册表账户 - 极简化约束条件
     #[account(seeds = [b"access_registry"], bump)]
-    pub access_registry: Box<Account<'info, AccessRegistryState>>,
+    pub access_registry: Account<'info, AccessRegistryState>,
     
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, anchor_spl::token_2022::Token2022>,
@@ -298,7 +296,7 @@ pub struct Initialize<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
 
-    /// 权限管理账户 - 简化约束条件
+    /// 权限管理账户 - 极简化约束条件
     #[account(
         init,
         payer = authority, 
@@ -306,7 +304,7 @@ pub struct Initialize<'info> {
         seeds = [b"authority", token_mint.key().as_ref()],
         bump
     )]
-    pub authority_state: Box<Account<'info, AuthorityState>>,
+    pub authority_state: Account<'info, AuthorityState>,
 
     /// 代币铸币账户 - 极简化约束条件
     #[account(
@@ -317,7 +315,7 @@ pub struct Initialize<'info> {
     )]
     pub token_mint: InterfaceAccount<'info, Mint>,
     
-    /// 铸币状态账户 - 简化约束条件
+    /// 铸币状态账户 - 极简化约束条件
     #[account(
         init,
         payer = authority, 
@@ -325,9 +323,9 @@ pub struct Initialize<'info> {
         seeds = [b"mint_state", token_mint.key().as_ref()],
         bump
     )]
-    pub mint_state: Box<Account<'info, MintState>>,
+    pub mint_state: Account<'info, MintState>,
 
-    /// 暂停状态账户 - 简化约束条件
+    /// 暂停状态账户 - 极简化约束条件
     #[account(
         init,
         payer = authority, 
@@ -335,11 +333,11 @@ pub struct Initialize<'info> {
         seeds = [b"pause_state", token_mint.key().as_ref()],
         bump
     )]
-    pub pause_state: Box<Account<'info, PauseState>>,
+    pub pause_state: Account<'info, PauseState>,
     
     /// 访问注册表账户 - 极简化约束条件
     #[account(seeds = [b"access_registry"], bump)]
-    pub access_registry: Box<Account<'info, AccessRegistryState>>,
+    pub access_registry: Account<'info, AccessRegistryState>,
     
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, anchor_spl::token_2022::Token2022>,
@@ -356,8 +354,7 @@ pub struct InitializeAccessRegistry<'info> {
         payer = authority, 
         space = AccessRegistryState::SIZE,
         seeds = [b"access_registry"],
-        bump,
-        constraint = !access_registry.initialized @ WusdError::Unauthorized
+        bump
     )]
     pub access_registry: Account<'info, AccessRegistryState>,
     pub system_program: Program<'info, System>,
