@@ -291,7 +291,7 @@ pub struct InitializePdaOnly<'info> {
         seeds = [b"authority", token_mint.key().as_ref()],
         bump
     )]
-    pub authority_state: Account<'info, AuthorityState>,
+    pub authority_state: Box<Account<'info, AuthorityState>>,
 
     /// 代币铸币账户 - 注意这里不使用init约束，因为账户已经存在
     #[account(
@@ -309,7 +309,7 @@ pub struct InitializePdaOnly<'info> {
         seeds = [b"mint_state", token_mint.key().as_ref()],
         bump
     )]
-    pub mint_state: Account<'info, MintState>,
+    pub mint_state: Box<Account<'info, MintState>>,
 
     /// 暂停状态账户
     #[account(
@@ -319,7 +319,7 @@ pub struct InitializePdaOnly<'info> {
         seeds = [b"pause_state", token_mint.key().as_ref()],
         bump
     )]
-    pub pause_state: Account<'info, PauseState>,
+    pub pause_state: Box<Account<'info, PauseState>>,
     
     /// 访问注册表账户，确保已初始化
     #[account(
@@ -327,7 +327,7 @@ pub struct InitializePdaOnly<'info> {
         bump,
         constraint = access_registry.initialized @ WusdError::AccessRegistryNotInitialized
     )]
-    pub access_registry: Account<'info, AccessRegistryState>,
+    pub access_registry: Box<Account<'info, AccessRegistryState>>,
     
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, anchor_spl::token_2022::Token2022>,
@@ -349,7 +349,7 @@ pub struct Initialize<'info> {
         seeds = [b"authority", token_mint.key().as_ref()],
         bump
     )]
-    pub authority_state: Account<'info, AuthorityState>,
+    pub authority_state: Box<Account<'info, AuthorityState>>,
 
     /// 代币铸币账户
     #[account(
@@ -369,7 +369,7 @@ pub struct Initialize<'info> {
         seeds = [b"mint_state", token_mint.key().as_ref()],
         bump
     )]
-    pub mint_state: Account<'info, MintState>,
+    pub mint_state: Box<Account<'info, MintState>>,
 
     /// 暂停状态账户
     #[account(
@@ -379,7 +379,7 @@ pub struct Initialize<'info> {
         seeds = [b"pause_state", token_mint.key().as_ref()],
         bump
     )]
-    pub pause_state: Account<'info, PauseState>,
+    pub pause_state: Box<Account<'info, PauseState>>,
     
     /// 访问注册表账户，确保已初始化
     #[account(
@@ -387,7 +387,7 @@ pub struct Initialize<'info> {
         bump,
         constraint = access_registry.initialized @ WusdError::AccessRegistryNotInitialized
     )]
-    pub access_registry: Account<'info, AccessRegistryState>,
+    pub access_registry: Box<Account<'info, AccessRegistryState>>,
     
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, anchor_spl::token_2022::Token2022>,

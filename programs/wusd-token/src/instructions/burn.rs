@@ -71,13 +71,13 @@ pub struct Burn<'info> {
         seeds = [b"authority", mint.key().as_ref()],
         bump
     )]
-    pub authority_state: Account<'info, AuthorityState>, 
+    pub authority_state: Box<Account<'info, AuthorityState>>, 
     #[account(mut)]
     pub mint_authority: Signer<'info>,
     #[account(mut)]
     pub authority: Signer<'info>,
     #[account(mut)]
-    pub mint: Box<InterfaceAccount<'info, anchor_spl::token_interface::Mint>>,
+    pub mint: InterfaceAccount<'info, anchor_spl::token_interface::Mint>,
     #[account(
         mut,
         constraint = token_account.owner == authority.key() @ WusdError::InvalidOwner,
@@ -85,25 +85,25 @@ pub struct Burn<'info> {
     )]
     pub token_account: Box<InterfaceAccount<'info, anchor_spl::token_interface::TokenAccount>>,
     pub token_program: Program<'info, Token2022>, 
-    pub mint_state: Account<'info, MintState>,
+    pub mint_state: Box<Account<'info, MintState>>,
     #[account(
         seeds = [b"pause_state", mint.key().as_ref()],
         bump,
         constraint = !pause_state.paused @ WusdError::ContractPaused
     )]
-    pub pause_state: Account<'info, PauseState>,
+    pub pause_state: Box<Account<'info, PauseState>>,
     #[account(
         seeds = [b"access_registry"],
         bump,
         constraint = access_registry.initialized @ WusdError::AccessRegistryNotInitialized
     )]
-    pub access_registry: Account<'info, AccessRegistryState>,
+    pub access_registry: Box<Account<'info, AccessRegistryState>>,
     #[account(
         seeds = [b"freeze", token_account.key().as_ref()],
         bump,
         constraint = !freeze_state.is_frozen @ WusdError::AccountFrozen
     )]
-    pub freeze_state: Account<'info, FreezeState>,
+    pub freeze_state: Box<Account<'info, FreezeState>>,
 } 
 
 /// 销毁事件，记录代币销毁的详细信息

@@ -98,14 +98,16 @@ pub struct PermitParams {
     pub deadline: i64,
     pub nonce: Option<u64>,
     pub scope: PermitScope,
-    pub signature: [u8; 64],
-    pub public_key: [u8; 32],
+    // 使用Vec<u8>代替固定大小数组，减少栈使用
+    pub signature: Vec<u8>,
+    pub public_key: Vec<u8>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub struct PermitMessage {
     pub contract: Pubkey,
-    pub domain_separator: [u8; 32],
+    // 使用Vec<u8>代替固定大小数组，减少栈使用
+    pub domain_separator: Vec<u8>,
     pub owner: Pubkey,
     pub spender: Pubkey,
     pub amount: u64,
@@ -113,7 +115,8 @@ pub struct PermitMessage {
     pub deadline: i64,
     pub scope: PermitScope,
     pub chain_id: u64,
-    pub version: [u8; 32]
+    // 使用Vec<u8>代替固定大小数组，减少栈使用
+    pub version: Vec<u8>
 } 
 
 /// 许可授权事件，记录EIP-2612兼容的许可授权信息

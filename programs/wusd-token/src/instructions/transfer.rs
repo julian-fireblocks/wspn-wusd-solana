@@ -135,9 +135,9 @@ pub struct TransferFrom<'info> {
         constraint = from_token.owner == owner.key() @ WusdError::InvalidOwner,
         constraint = from_token.mint == to_token.mint @ WusdError::InvalidMint
     )]
-    pub from_token: Box<InterfaceAccount<'info, anchor_spl::token_interface::TokenAccount>>,
+    pub from_token: InterfaceAccount<'info, anchor_spl::token_interface::TokenAccount>,
     #[account(mut)]
-    pub to_token: Box<InterfaceAccount<'info, anchor_spl::token_interface::TokenAccount>>,
+    pub to_token: InterfaceAccount<'info, anchor_spl::token_interface::TokenAccount>,
     #[account(
         seeds = [
             b"permit",
@@ -206,24 +206,24 @@ pub struct Transfer<'info> {
         seeds = [b"pause_state", from_token.mint.as_ref()],
         bump,
     )]
-    pub pause_state: Account<'info, PauseState>,
+    pub pause_state: Box<Account<'info, PauseState>>,
     #[account(
         seeds = [b"access_registry"],
         bump,
     )]
-    pub access_registry: Account<'info, AccessRegistryState>,
+    pub access_registry: Box<Account<'info, AccessRegistryState>>,
     #[account(
         seeds = [b"freeze", from_token.key().as_ref()],
         bump,
         constraint = !from_freeze_state.is_frozen @ WusdError::AccountFrozen
     )]
-    pub from_freeze_state: Account<'info, FreezeState>,
+    pub from_freeze_state: Box<Account<'info, FreezeState>>,
     #[account(
         seeds = [b"freeze", to_token.key().as_ref()],
         bump,
         constraint = !to_freeze_state.is_frozen @ WusdError::AccountFrozen
     )]
-    pub to_freeze_state: Account<'info, FreezeState>,
+    pub to_freeze_state: Box<Account<'info, FreezeState>>,
 }
 
 #[event]
