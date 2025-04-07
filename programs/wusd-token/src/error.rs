@@ -12,8 +12,6 @@ pub enum WusdError {
     InvalidNonce,
     #[msg("Unauthorized")]
     Unauthorized,
-    #[msg("Not a minter")]
-    NotMinter,
     #[msg("Not a pauser")]
     NotPauser,
     #[msg("Insufficient balance")]
