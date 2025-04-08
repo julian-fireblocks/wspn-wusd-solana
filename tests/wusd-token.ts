@@ -44,7 +44,6 @@ describe("WUSD Token Test", () => {
   let authorityPda: PublicKey;
   let mintStatePda: PublicKey;
   let pauseStatePda: PublicKey;
-  let accessRegistryPda: PublicKey;
   let authorityBump: number;
 
   // 定义代币账户
@@ -64,19 +63,24 @@ describe("WUSD Token Test", () => {
       console.log("Generated keypairs:");
       console.log("Mint keypair:", mintKeypair.publicKey.toString());
       console.log("Recipient keypair:", recipientKeypair.publicKey.toString());
-      
+
       // 检查连接是否正确指向devnet
       const endpoint = provider.connection.rpcEndpoint;
       console.log("Connected to:", endpoint);
       if (!endpoint.includes("devnet")) {
-        console.warn("Warning: Not connected to devnet! Current endpoint:", endpoint);
+        console.warn(
+          "Warning: Not connected to devnet! Current endpoint:",
+          endpoint
+        );
       }
 
       // 2. 跳过空投步骤，在devnet上使用已有的SOL
-      console.log("Skipping airdrop on devnet - please ensure your wallet already has SOL");
+      console.log(
+        "Skipping airdrop on devnet - please ensure your wallet already has SOL"
+      );
       console.log("Wallet address:", provider.wallet.publicKey.toString());
       console.log("Recipient address:", recipientKeypair.publicKey.toString());
-    
+
       // 3. 计算 PDA 地址
       console.log("Calculating PDA addresses...");
       // 使用显式定义的programId，因为program.programId可能未定义
@@ -95,11 +99,6 @@ describe("WUSD Token Test", () => {
         programId
       );
 
-      [accessRegistryPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from("access_registry")],
-        programId
-      );
-
       // 4. 初始化合约状态
       console.log("Initializing contract state...");
       try {
@@ -109,7 +108,6 @@ describe("WUSD Token Test", () => {
         console.log("Authority PDA:", authorityPda.toString());
         console.log("Mint State PDA:", mintStatePda.toString());
         console.log("Pause State PDA:", pauseStatePda.toString());
-        console.log("Access Registry PDA:", accessRegistryPda.toString());
 
         // 重新加载程序实例，确保程序正确初始化
         if (!program || !program.programId) {
@@ -257,7 +255,7 @@ describe("WUSD Token Test", () => {
             try {
               // 使用程序的initialize_pda_only方法来初始化所有PDA账户
               const tx = await program.methods
-                .initializePdaOnly(6) // 6位小数
+                .initialize(6) // 6位小数
                 .accounts({
                   authority: provider.wallet.publicKey,
                   authorityState: authorityPda,
@@ -323,103 +321,6 @@ describe("WUSD Token Test", () => {
     }
   });
 
-  it("Initialize Access Registry", async () => {
-    try {
-      // 首先检查账户是否存在
-      const accountInfo = await provider.connection.getAccountInfo(
-        accessRegistryPda
-      );
-
-      if (accountInfo !== null) {
-        // 如果账户已存在，验证其状态
-        const accessRegistry = await program.account.accessRegistryState.fetch(
-          accessRegistryPda
-        );
-        if (accessRegistry.initialized) {
-          console.log("Access Registry already initialized");
-          return;
-        }
-      }
-
-      // 初始化访问注册表
-      const tx = await program.methods
-        .initializeAccessRegistry()
-        .accounts({
-          authority: provider.wallet.publicKey,
-          accessRegistry: accessRegistryPda,
-          systemProgram: SystemProgram.programId,
-        })
-        .rpc();
-
-      await provider.connection.confirmTransaction(tx);
-
-      // 验证初始化结果
-      const accessRegistry = await program.account.accessRegistryState.fetch(
-        accessRegistryPda
-      );
-      console.log("Access Registry State after initialization:", {
-        authority: accessRegistry.authority.toString(),
-        initialized: accessRegistry.initialized,
-        operatorCount: accessRegistry.operatorCount,
-      });
-
-      // 确保初始化成功
-      if (!accessRegistry.initialized) {
-        throw new Error("Access Registry initialization failed");
-      }
-
-      console.log("Access Registry initialized successfully");
-    } catch (error) {
-      console.error("Access Registry initialization failed:", error);
-      throw error;
-    }
-  });
-
-  it("Set minter access", async () => {
-    try {
-      // 添加重试机制
-      let retries = 3;
-      let accessRegistry;
-
-      while (retries > 0) {
-        accessRegistry = await program.account.accessRegistryState.fetch(
-          accessRegistryPda
-        );
-
-        if (accessRegistry.initialized) {
-          break;
-        }
-
-        console.log(
-          `Waiting for access registry initialization... (${retries} retries left)`
-        );
-        await sleep(1000); // 等待1秒
-        retries--;
-      }
-
-      if (!accessRegistry.initialized) {
-        throw new Error("Access Registry not initialized after retries");
-      }
-
-      // 添加铸币权限
-      const tx = await program.methods
-        .addOperator(provider.wallet.publicKey)
-        .accounts({
-          authority: provider.wallet.publicKey,
-          authorityState: authorityPda,
-          accessRegistry: accessRegistryPda,
-          operator: provider.wallet.publicKey,
-        })
-        .rpc();
-
-      await provider.connection.confirmTransaction(tx);
-      console.log("Minter access granted");
-    } catch (error) {
-      console.error("Failed to set minter access:", error);
-      throw error;
-    }
-  });
-
   it("Create Recipient Token Account", async () => {
     try {
       // 获取关联代币账户地址
@@ -469,7 +370,6 @@ describe("WUSD Token Test", () => {
           authorityState: authorityPda,
           mintState: mintStatePda,
           pauseState: pauseStatePda,
-          accessRegistry: accessRegistryPda,
         })
         .signers([provider.wallet.payer])
         .rpc();
@@ -491,49 +391,11 @@ describe("WUSD Token Test", () => {
   it("Transfer WUSD tokens", async () => {
     try {
       // 跳过为 recipientKeypair 请求空投，在devnet上使用已有的SOL
-      console.log("Skipping airdrop to recipient on devnet - please ensure your wallet already has SOL");
+      console.log(
+        "Skipping airdrop to recipient on devnet - please ensure your wallet already has SOL"
+      );
       console.log("Recipient address:", recipientKeypair.publicKey.toString());
       await sleep(1000); // 等待一下以确保连接稳定
-
-      // 检查当前操作员列表
-      const accessRegistry = await program.account.accessRegistryState.fetch(
-        accessRegistryPda
-      );
-
-      // 如果操作员列表已满，移除第一个操作员
-      if (accessRegistry.operatorCount >= 10) {
-        const removeOperatorTx = await program.methods
-          .removeOperator(accessRegistry.operators[0])
-          .accounts({
-            authority: provider.wallet.publicKey,
-            authorityState: authorityPda,
-            accessRegistry: accessRegistryPda,
-            operator: accessRegistry.operators[0],
-          })
-          .rpc();
-
-        await provider.connection.confirmTransaction(removeOperatorTx);
-        console.log(
-          "Removed operator:",
-          accessRegistry.operators[0].toString()
-        );
-        await sleep(1000);
-      }
-
-      // 为发送方账户添加转账权限
-      const addOperatorTx = await program.methods
-        .addOperator(recipientKeypair.publicKey)
-        .accounts({
-          authority: provider.wallet.publicKey,
-          authorityState: authorityPda,
-          accessRegistry: accessRegistryPda,
-          operator: recipientKeypair.publicKey,
-        })
-        .rpc();
-
-      await provider.connection.confirmTransaction(addOperatorTx);
-      console.log("Transfer access granted to sender");
-
       // 创建新的接收账户
       const newRecipient = Keypair.generate();
       const newRecipientTokenAccount = getAssociatedTokenAddressSync(
@@ -647,7 +509,6 @@ describe("WUSD Token Test", () => {
           tokenProgram: TOKEN_2022_PROGRAM_ID,
           tokenMint: mintKeypair.publicKey,
           pauseState: pauseStatePda,
-          accessRegistry: accessRegistryPda,
           fromFreezeState: fromFreezeState,
           toFreezeState: toFreezeState,
         })
@@ -695,61 +556,16 @@ describe("WUSD Token Test", () => {
 
   it("Test transfer_from functionality", async () => {
     try {
-      // 跳过为 recipientKeypair 请求空投，在devnet上使用已有的SOL
-      console.log("Skipping airdrop to recipient on devnet - please ensure your wallet already has SOL");
       console.log("Recipient address:", recipientKeypair.publicKey.toString());
-
-      // 检查当前操作员列表
-      const accessRegistry = await program.account.accessRegistryState.fetch(
-        accessRegistryPda
-      );
-      console.log("Current operators:", {
-        operatorCount: accessRegistry.operatorCount,
-        operators: accessRegistry.operators
-          .slice(0, accessRegistry.operatorCount)
-          .map((op) => op.toString()),
-      });
-
-      // 如果操作员列表已满，移除前两个操作员
-      if (accessRegistry.operatorCount >= 9) {
-        for (let i = 0; i < 2; i++) {
-          const operator = accessRegistry.operators[i];
-          const removeOperatorTx = await program.methods
-            .removeOperator(operator)
-            .accounts({
-              authority: provider.wallet.publicKey,
-              authorityState: authorityPda,
-              accessRegistry: accessRegistryPda,
-              operator: operator,
-            })
-            .rpc();
-
-          await provider.connection.confirmTransaction(removeOperatorTx);
-          console.log(`Removed operator ${i + 1}:`, operator.toString());
-          await sleep(1000);
-        }
-      }
 
       // 为 spender 添加操作员权限
       const spender = Keypair.generate(); // 创建一个新的spender账户
-      const addOperatorTx = await program.methods
-        .addOperator(spender.publicKey)
-        .accounts({
-          authority: provider.wallet.publicKey,
-          authorityState: authorityPda,
-          accessRegistry: accessRegistryPda,
-          operator: spender.publicKey,
-        })
-        .rpc();
-
-      await provider.connection.confirmTransaction(addOperatorTx);
-      console.log("Added spender as operator");
-      await sleep(1000);
-
       // 为spender账户和recipient账户转账一些SOL以支付账户创建费用
-      console.log("Transferring SOL to spender and recipient for account creation fees");
+      console.log(
+        "Transferring SOL to spender and recipient for account creation fees"
+      );
       console.log("Spender address:", spender.publicKey.toString());
-      
+
       // 转账SOL给spender账户
       const transferToSpenderTx = new anchor.web3.Transaction().add(
         SystemProgram.transfer({
@@ -759,7 +575,7 @@ describe("WUSD Token Test", () => {
         })
       );
       await provider.sendAndConfirm(transferToSpenderTx);
-      
+
       // 转账SOL给recipient账户
       const transferToRecipientTx = new anchor.web3.Transaction().add(
         SystemProgram.transfer({
@@ -769,7 +585,7 @@ describe("WUSD Token Test", () => {
         })
       );
       await provider.sendAndConfirm(transferToRecipientTx);
-      
+
       console.log("SOL transferred to spender and recipient accounts");
 
       // 创建接收账户的代币账户
@@ -957,7 +773,10 @@ describe("WUSD Token Test", () => {
           approveTx,
           [recipientKeypair]
         );
-        await provider.connection.confirmTransaction(approveSignature, "confirmed");
+        await provider.connection.confirmTransaction(
+          approveSignature,
+          "confirmed"
+        );
         console.log("Approve transaction confirmed:", approveSignature);
 
         // 等待一段时间确保approve生效
@@ -974,7 +793,6 @@ describe("WUSD Token Test", () => {
             permit: permitPda,
             mintState: mintStatePda,
             pauseState: pauseStatePda,
-            accessRegistry: accessRegistryPda,
             tokenProgram: TOKEN_2022_PROGRAM_ID,
             tokenMint: mintKeypair.publicKey,
             fromFreezeState: fromFreezeState,
@@ -1030,27 +848,6 @@ describe("WUSD Token Test", () => {
     }
   });
 
-  it("Set burn access", async () => {
-    try {
-      // 添加销毁权限
-      const tx = await program.methods
-        .addOperator(recipientKeypair.publicKey) 
-        .accounts({
-          authority: provider.wallet.publicKey,
-          authorityState: authorityPda,
-          accessRegistry: accessRegistryPda,
-          operator: recipientKeypair.publicKey,
-        })
-        .rpc();
-
-      await provider.connection.confirmTransaction(tx);
-      console.log("Burn access granted");
-    } catch (error) {
-      console.error("Failed to set burn access:", error);
-      throw error;
-    }
-  });
-
   it("Burn WUSD tokens", async () => {
     try {
       console.log("Starting burn test...");
@@ -1075,8 +872,6 @@ describe("WUSD Token Test", () => {
           tokenProgram: TOKEN_2022_PROGRAM_ID,
           mintState: mintStatePda,
           pauseState: pauseStatePda,
-          accessRegistry: accessRegistryPda,
-          mintAuthority: recipientKeypair.publicKey,
         })
         .signers([recipientKeypair])
         .rpc();
