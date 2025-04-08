@@ -2,6 +2,20 @@ use anchor_lang::prelude::*;
 use crate::error::WusdError;  
 use crate::state::{AuthorityState, PauseState};
 
+/// 合约暂停事件，记录合约暂停状态变更
+#[event]
+pub struct ContractPausedEvent {
+    /// 执行暂停操作的账户地址
+    pub authority: Pubkey,
+}
+
+/// 合约恢复事件，记录合约恢复状态变更
+#[event]
+pub struct ContractUnpausedEvent {
+    /// 执行恢复操作的账户地址
+    pub authority: Pubkey,
+}
+
 /// 暂停合约
 /// * `ctx` - 上下文
 pub fn pause(ctx: Context<Pause>) -> Result<()> { 
@@ -11,6 +25,12 @@ pub fn pause(ctx: Context<Pause>) -> Result<()> {
         return Ok(());
     }
     ctx.accounts.pause_state.set_paused(true);
+    
+    // 发出合约暂停事件
+    emit!(ContractPausedEvent {
+        authority: ctx.accounts.authority.key(),
+    });
+    
     Ok(())
 }
 
@@ -23,6 +43,12 @@ pub fn unpause(ctx: Context<Unpause>) -> Result<()> {
         return Ok(());
     }
     ctx.accounts.pause_state.set_paused(false);
+    
+    // 发出合约恢复事件
+    emit!(ContractUnpausedEvent {
+        authority: ctx.accounts.authority.key(),
+    });
+    
     Ok(())
 }
 
