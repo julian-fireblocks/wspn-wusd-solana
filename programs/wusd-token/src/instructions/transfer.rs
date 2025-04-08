@@ -93,10 +93,8 @@ pub fn transfer_from(ctx: Context<TransferFrom>, amount: u64) -> Result<()> {
 
 #[derive(Accounts)]
 pub struct TransferFrom<'info> {
-    #[account(mut)]
     pub spender: Signer<'info>,
     /// CHECK: This account is not read or written to
-    #[account(mut)]
     pub owner: AccountInfo<'info>,
     #[account(
         mut,
@@ -143,10 +141,8 @@ pub struct TransferFrom<'info> {
 
 #[derive(Accounts)]
 pub struct Transfer<'info> {
-    #[account(mut)]
     pub from: Signer<'info>,
     /// CHECK: This account is not read or written to
-    #[account(mut)]
     pub to: AccountInfo<'info>,
     #[account(
         mut,

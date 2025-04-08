@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_2022::Token2022; 
 use crate::error::WusdError;  
 use crate::state::{MintState, PermitState, AllowanceState, PauseState};
+use solana_program;
 
 /// 处理授权许可请求，允许代币持有者授权其他账户使用其代币
 /// 
@@ -31,6 +32,28 @@ pub fn permit(ctx: Context<Permit>, params: PermitParams) -> Result<()> {
         ctx.accounts.permit_state.spender == ctx.accounts.spender.key(),
         WusdError::InvalidPermit
     );
+
+    // 验证签名
+    if let Some(nonce) = params.nonce {
+        let message = PermitMessage {
+            contract: *ctx.program_id,
+            domain_separator: b"WUSD_PERMIT".to_vec(),
+            owner: ctx.accounts.owner.key(),
+            spender: ctx.accounts.spender.key(),
+            amount: params.amount,
+            nonce,
+            deadline: params.deadline,
+            scope: params.scope,
+            chain_id: 1, // Solana主网
+            version: b"1".to_vec()
+        };
+
+        let msg_bytes = message.try_to_vec()?;
+        require!(
+            verify_ed25519_signature(&params.public_key, &msg_bytes, &params.signature),
+            WusdError::InvalidSignature
+        );
+    }
     
     // 初始化 permit_state
     ctx.accounts.permit_state.set_inner(PermitState::initialize(
@@ -163,4 +186,26 @@ impl PermitScope {
         burn: false,
         all: false
     };
+}
+
+/// 验证Ed25519签名
+fn verify_ed25519_signature(public_key: &[u8], message: &[u8], signature: &[u8]) -> bool {
+    if public_key.len() != 32 || signature.len() != 64 {
+        return false;
+    }
+    
+    let ix = solana_program::instruction::Instruction::new_with_bytes(
+        solana_program::ed25519_program::id(),
+        &[
+            &public_key[..],
+            &message[..],
+            &signature[..]
+        ].concat(),
+        vec![]
+    );
+    
+    solana_program::program::invoke(
+        &ix,
+        &[]
+    ).is_ok()
 }

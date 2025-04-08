@@ -106,6 +106,9 @@ pub struct InitializeFreezeState<'info> {
     pub freeze_state: Account<'info, FreezeState>,
     /// CHECK: Token account being frozen/unfrozen
     pub token_account: InterfaceAccount<'info, TokenAccount>,
+    #[account(
+        constraint = token_mint.key() == token_account.mint @ WusdError::InvalidMint
+    )]
     pub token_mint: InterfaceAccount<'info, anchor_spl::token_interface::Mint>,
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -129,6 +132,9 @@ pub struct FreezeOperationAccounts<'info> {
     pub freeze_state: Account<'info, FreezeState>, 
    
     /// CHECK: 这个账户仅用于生成PDA种子
+    #[account(
+        constraint = account.owner == &token_program.key() @ WusdError::InvalidOwner
+    )]
     pub account: AccountInfo<'info>,
 
     #[account(

@@ -40,7 +40,6 @@ pub fn mint(ctx: Context<MintAccounts>, amount: u64, bump: u8) -> Result<()> {
 #[derive(Accounts)]
 #[instruction(amount: u64, bump: u8)]
 pub struct MintAccounts<'info> {
-    #[account(mut)]
     pub authority: Signer<'info>,
     #[account(mut)]
     pub token_mint: InterfaceAccount<'info, anchor_spl::token_interface::Mint>,

@@ -46,4 +46,6 @@ pub enum WusdError {
     InvalidAddress,
     #[msg("Invalid permit")]
     InvalidPermit,
+    #[msg("Invalid signature")]
+    InvalidSignature,
 }
