@@ -161,15 +161,19 @@ pub mod wusd_token {
         instructions::burn::burn(ctx, amount)
     }   
     /// 冻结账户
-    pub fn freeze_account(ctx: Context<FreezeAccount>) -> Result<()> { 
-        instructions::freeze::freeze_account(ctx)
+    pub fn freeze_account(ctx: Context<FreezeOperationAccounts>) -> Result<()> { 
+        instructions::freeze::handle_freeze_operation(ctx, FreezeOperation::Freeze)
     }
 
     /// 解冻账户
-    pub fn unfreeze_account(ctx: Context<UnfreezeAccount>) -> Result<()> {
-        instructions::freeze::unfreeze_account(ctx) 
+    pub fn unfreeze_account(ctx: Context<FreezeOperationAccounts>) -> Result<()> {
+        instructions::freeze::handle_freeze_operation(ctx, FreezeOperation::Unfreeze)
     }   
-    
+
+    /// 从被冻结的账户中回收资产
+    pub fn recover_frozen_assets(ctx: Context<RecoverFrozenAssets>, amount: u64) -> Result<()> {
+        instructions::freeze::recover_frozen_assets(ctx, amount)
+    } 
 }
 
 #[derive(Accounts)]
