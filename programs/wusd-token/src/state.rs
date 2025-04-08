@@ -14,53 +14,7 @@ pub struct AllowanceState {
 
 impl AllowanceState {
     /// 授权额度状态账户大小
-    pub const SIZE: usize = 8 + 32 + 32 + 8;
-
-    /// 初始化授权状态
-    /// * `owner` - 代币所有者
-    /// * `spender` - 被授权者
-    /// * `amount` - 授权金额
-    pub fn initialize(owner: Pubkey, spender: Pubkey, amount: u64) -> Self {
-        Self {
-            owner,
-            spender,
-            amount,
-        }
-    }
-
-    /// 增加授权额度
-    /// * `added_value` - 增加的额度
-    pub fn increase_allowance(&mut self, added_value: u64) -> Result<()> {
-        self.amount = self
-            .amount
-            .checked_add(added_value)
-            .ok_or(error!(crate::error::WusdError::InvalidAmount))?;
-        Ok(())
-    }
-
-    /// 减少授权额度
-    /// * `subtracted_value` - 减少的额度
-    pub fn decrease_allowance(&mut self, subtracted_value: u64) -> Result<()> {
-        require!(
-            self.amount >= subtracted_value,
-            crate::error::WusdError::InvalidAmount
-        );
-        self.amount = self
-            .amount
-            .checked_sub(subtracted_value)
-            .ok_or(error!(crate::error::WusdError::InvalidAmount))?;
-        Ok(())
-    }
-
-    /// 验证授权额度是否足够
-    /// * `amount` - 待验证的金额
-    pub fn validate_allowance(&self, amount: u64) -> Result<()> {
-        require!(
-            self.amount >= amount,
-            crate::error::WusdError::InvalidAmount
-        );
-        Ok(())
-    }
+    pub const SIZE: usize = 8 + 32 + 32 + 8; 
 }
 
 /// 签名许可状态账户，用于EIP-2612兼容的签名授权
@@ -101,22 +55,8 @@ impl PermitState {
             expiration,
             bump,
         }
-    }
+    } 
 
-    /// 增加随机数
-    pub fn increment_nonce(&mut self) {
-        self.nonce = self.nonce.checked_add(1).unwrap_or(0);
-    }
-
-    /// 验证随机数
-    /// * `expected_nonce` - 期望的随机数
-    pub fn validate_nonce(&self, expected_nonce: u64) -> Result<()> {
-        require!(
-            self.nonce == expected_nonce,
-            crate::error::WusdError::InvalidNonce
-        );
-        Ok(())
-    }
 }
 
 /// 权限管理状态账户，存储合约的权限配置
@@ -235,17 +175,7 @@ impl PauseState {
     pub const SIZE: usize = 8 + 1; // paused     /// 设置暂停状态
     pub fn set_paused(&mut self, paused: bool) {
         self.paused = paused;
-    }
-
-    /// 验证合约未暂停 - 简化实现以减少栈使用
-    #[inline(always)]
-    pub fn validate_not_paused(&self) -> Result<()> {
-        if self.paused {
-            Err(error!(WusdError::ContractPaused))
-        } else {
-            Ok(())
-        }
-    }
+    } 
 }
 
 /// 账户冻结状态，用于控制账户的冻结/解冻

@@ -1,5 +1,5 @@
 use crate::error::WusdError;
-use crate::state::{AuthorityState, FreezeState, MintState, PauseState};
+use crate::state::{AuthorityState, MintState, PauseState};
 use anchor_lang::prelude::*;
 use anchor_spl::token_2022::Token2022;
 use anchor_spl::token_2022::{self, burn as token_burn};
@@ -60,13 +60,7 @@ pub struct Burn<'info> {
         bump,
         constraint = !pause_state.paused @ WusdError::ContractPaused
     )]
-    pub pause_state: Account<'info, PauseState>, 
-    #[account(
-        seeds = [b"freeze", token_account.key().as_ref()],
-        bump,
-        constraint = !freeze_state.is_frozen @ WusdError::AccountFrozen
-    )]
-    pub freeze_state: Account<'info, FreezeState>,
+    pub pause_state: Account<'info, PauseState>,  
 }
 
 /// 销毁事件，记录代币销毁的详细信息

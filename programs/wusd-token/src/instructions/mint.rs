@@ -5,18 +5,8 @@ use anchor_spl::token_2022::Token2022;
 use anchor_spl::token_2022::{self, mint_to};
 
 pub fn mint(ctx: Context<MintAccounts>, amount: u64, bump: u8) -> Result<()> {
-    // 验证金额，确保大于0
-    if amount == 0 {
-        return Err(error!(WusdError::InvalidAmount));
-    }
-
-    // 验证铸币权限
-    require!(
-        ctx.accounts
-            .authority_state
-            .is_minter(ctx.accounts.authority.key()),
-        WusdError::Unauthorized
-    );
+    // 验证金额有效性
+    require!(amount > 0, WusdError::InvalidAmount); 
 
     // 执行铸币 - 极简化CPI调用
     let mint_key = ctx.accounts.token_mint.key();
@@ -59,7 +49,8 @@ pub struct MintAccounts<'info> {
     pub token_program: Program<'info, Token2022>,
     #[account(
         seeds = [b"authority", token_mint.key().as_ref()],
-        bump
+        bump,
+        constraint = authority_state.is_minter(authority.key()) @ WusdError::Unauthorized
     )]
     pub authority_state: Account<'info, AuthorityState>,
     #[account(
@@ -69,7 +60,8 @@ pub struct MintAccounts<'info> {
     pub mint_state: Account<'info, MintState>,
     #[account(
         seeds = [b"pause_state", token_mint.key().as_ref()],
-        bump
+        bump,
+        constraint = !pause_state.paused @ WusdError::ContractPaused
     )]
     pub pause_state: Account<'info, PauseState>,
     pub system_program: Program<'info, System>,
