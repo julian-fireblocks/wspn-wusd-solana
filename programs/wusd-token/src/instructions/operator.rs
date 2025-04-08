@@ -7,12 +7,6 @@ pub fn add_operator(ctx: Context<ManageOperator>, operator: Pubkey) -> Result<()
     let access_registry = &mut ctx.accounts.access_registry;
     require!(access_registry.initialized, WusdError::AccessRegistryNotInitialized);
     
-    // 确保调用者是管理员
-    require!(
-        ctx.accounts.authority_state.is_admin(ctx.accounts.authority.key()),
-        WusdError::Unauthorized
-    ); 
-    
     // 添加操作员
     access_registry.add_operator(operator) 
 }  
@@ -20,14 +14,7 @@ pub fn add_operator(ctx: Context<ManageOperator>, operator: Pubkey) -> Result<()
 /// 移除操作员
 pub fn remove_operator(ctx: Context<ManageOperator>, operator: Pubkey) -> Result<()> {
     let access_registry = &mut ctx.accounts.access_registry;
-    require!(access_registry.initialized, WusdError::AccessRegistryNotInitialized);
-    
-    // 确保调用者是管理员
-    require!(
-        ctx.accounts.authority_state.is_admin(ctx.accounts.authority.key()),
-        WusdError::Unauthorized
-    );
-    
+    require!(access_registry.initialized, WusdError::AccessRegistryNotInitialized); 
     // 移除操作员
     access_registry.remove_operator(operator)
 }

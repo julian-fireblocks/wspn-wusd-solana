@@ -1,7 +1,6 @@
 //! WUSD Token 程序  
 mod error;
-mod state; 
-mod utils;
+mod state;
 mod access;
 mod instructions; 
 
@@ -19,7 +18,8 @@ use instructions::transfer::*;
 use instructions::permit::*;
 use instructions::operator::*;
 use instructions::pause::*;
-use instructions::freeze::*; 
+use instructions::freeze::*;
+use instructions::admin::*; 
 
 // 辅助函数：初始化状态账户，减少栈使用
 #[inline(always)]
@@ -32,8 +32,6 @@ fn initialize_state_accounts(
     decimals: u8,
 ) {
     authority_state.admin = auth_key;
-    authority_state.minter = auth_key;
-    authority_state.pauser = auth_key;
 
     mint_state.mint = token_mint_key;
     mint_state.decimals = decimals;
@@ -198,6 +196,12 @@ pub mod wusd_token {
     pub fn transfer_from(ctx: Context<TransferFrom>, amount: u64) -> Result<()> {
         instructions::transfer::transfer_from(ctx, amount) 
     } 
+
+    /// 暂停合约
+    /// 转移管理员权限
+    pub fn transfer_admin(ctx: Context<TransferAdmin>, new_admin: Pubkey) -> Result<()> {
+        instructions::admin::transfer_admin(ctx, new_admin)
+    }
 
     /// 暂停合约
     pub fn pause(ctx: Context<Pause>) -> Result<()> {

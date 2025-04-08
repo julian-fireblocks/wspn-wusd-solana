@@ -1,5 +1,4 @@
-use anchor_lang::prelude::*;
-use crate::access::AccessLevel;
+use anchor_lang::prelude::*; 
 use crate::error::WusdError;
 
 /// 授权额度状态账户，存储代币授权信息
@@ -106,22 +105,16 @@ impl PermitState {
 pub struct AuthorityState {
     /// 管理员地址
     pub admin: Pubkey,
-    /// 铸币权限地址
-    pub minter: Pubkey,
-    /// 暂停权限地址
-    pub pauser: Pubkey,
 }
 
 impl AuthorityState {
     /// 权限管理状态账户大小
-    /// discriminator + admin + minter + pauser
-    pub const SIZE: usize = 8 + 32 * 3;
+    /// discriminator + admin
+    pub const SIZE: usize = 8 + 32;
 
     pub fn initialize(admin: Pubkey) -> Self {
         Self {
-            admin: admin,
-            minter: admin,
-            pauser: admin,
+            admin
         }
     }
 
@@ -129,13 +122,12 @@ impl AuthorityState {
         self.admin == user
     }
 
-    pub fn is_minter(&self, user: Pubkey) -> bool {
-        self.minter == user
+    /// 转移管理员权限
+    pub fn transfer_admin(&mut self, new_admin: Pubkey) -> Result<()> {
+        require!(new_admin != Pubkey::default(), WusdError::InvalidAddress);
+        self.admin = new_admin;
+        Ok(())
     }
-
-    pub fn is_pauser(&self, user: Pubkey) -> bool {
-        self.pauser == user
-    } 
 }
 
 /// 访问权限注册表状态
@@ -211,12 +203,21 @@ impl AccessRegistryState {
         Ok(())
     }
 
-    /// 检查是否有访问权限 - 极度简化实现以减少栈使用
-    #[inline(always)]
-    pub fn has_access(&self, _user: Pubkey, _level: AccessLevel) -> bool {
-        // 极简化实现，直接返回true以减少栈使用
-        // 在生产环境中应该实现完整的权限检查
-        true
+    pub fn has_access(&self, user: Pubkey) -> bool {
+        // 管理员拥有所有权限
+        if self.authority == user {
+            return true;
+        }
+
+        // 检查是否为操作员
+        for i in 0..self.operator_count as usize {
+            if self.operators[i] == user {
+                return true;
+            }
+        }
+
+        // 如果不是管理员也不是操作员，则没有权限
+        false
     }
 }
 

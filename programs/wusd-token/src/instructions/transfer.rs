@@ -1,6 +1,7 @@
 use crate::error::WusdError;
-use crate::state::{AccessRegistryState, AuthorityState, FreezeState, MintState, PauseState, PermitState};
-use crate::access::AccessLevel;
+use crate::state::{
+    AccessRegistryState, AuthorityState, FreezeState, MintState, PauseState, PermitState,
+};
 use anchor_lang::prelude::*;
 use anchor_spl::token_2022::{self, transfer_checked, Token2022};
 use anchor_spl::token_interface::TokenAccount;
@@ -11,19 +12,7 @@ use anchor_spl::token_interface::TokenAccount;
 pub fn transfer(ctx: Context<Transfer>, amount: u64) -> Result<()> {
     // 验证系统未被暂停
     ctx.accounts.pause_state.validate_not_paused()?;
-    require!(amount > 0, WusdError::InvalidAmount);
-    
-    // 检查冻结状态 - 通过账户约束已经验证
-    // 验证from_token和to_token的所有者 - 通过账户约束已经验证
-    
-    // 验证访问权限
-    require!(
-        ctx.accounts.access_registry.has_access(
-            ctx.accounts.from.key(),
-            AccessLevel::Debit
-        ),
-        WusdError::AccessDenied
-    );
+    require!(amount > 0, WusdError::InvalidAmount); 
 
     // 执行转账
     transfer_checked(
@@ -45,7 +34,7 @@ pub fn transfer(ctx: Context<Transfer>, amount: u64) -> Result<()> {
         from: ctx.accounts.from.key(),
         to: ctx.accounts.to.key(),
         amount,
-        fee: 0, 
+        fee: 0,
         timestamp: Clock::get()?.unix_timestamp,
         has_memo: false,
         spender: None, // 使用Option<Pubkey>代替字节数组
@@ -66,24 +55,11 @@ pub fn transfer_from(ctx: Context<TransferFrom>, amount: u64) -> Result<()> {
         WusdError::InsufficientAllowance
     );
 
-    // 验证 token account 所有权 - 通过账户约束已经验证
-    
     // 验证系统未暂停状态
     ctx.accounts.pause_state.validate_not_paused()?;
 
     // 验证金额大于0
-    require!(amount > 0, WusdError::InvalidAmount);
-
-    // 检查冻结状态 - 通过账户约束已经验证
-    
-    // 验证访问权限
-    require!(
-        ctx.accounts.access_registry.has_access(
-            ctx.accounts.spender.key(),
-            AccessLevel::Debit
-        ),
-        WusdError::AccessDenied
-    );
+    require!(amount > 0, WusdError::InvalidAmount); 
 
     // 直接使用spender作为authority执行转账
     transfer_checked(
@@ -107,18 +83,18 @@ pub fn transfer_from(ctx: Context<TransferFrom>, amount: u64) -> Result<()> {
         .amount
         .checked_sub(amount)
         .ok_or(WusdError::InsufficientAllowance)?;
-        
+
     // 发送转账事件 - 使用更简洁的方式处理Pubkey，减少栈使用
     emit!(TransferEvent {
         from: ctx.accounts.owner.key(),
         to: ctx.accounts.to_token.owner,
         amount,
-        fee: 0, 
+        fee: 0,
         timestamp: Clock::get()?.unix_timestamp,
         has_memo: true,
         spender: Some(ctx.accounts.spender.key()),
     });
-    
+
     Ok(())
 }
 

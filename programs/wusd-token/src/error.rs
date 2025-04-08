@@ -42,4 +42,6 @@ pub enum WusdError {
     InvalidMint, 
     #[msg("Expired permit")]
     ExpiredPermit,
+    #[msg("Invalid address")]
+    InvalidAddress,
 }

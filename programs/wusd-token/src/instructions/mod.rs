@@ -5,3 +5,4 @@ pub mod permit;
 pub mod operator;
 pub mod pause;
 pub mod freeze;
+pub mod admin;

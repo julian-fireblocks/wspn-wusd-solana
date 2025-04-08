@@ -1,7 +1,7 @@
-use anchor_lang::prelude::*; 
-use crate::error::WusdError;   
-use crate::state::{FreezeState, AuthorityState};
-use anchor_spl::token_interface::{TokenAccount, Token2022};
+use crate::error::WusdError;
+use crate::state::{AuthorityState, FreezeState};
+use anchor_lang::prelude::*;
+use anchor_spl::token_interface::{Token2022, TokenAccount};
 
 pub fn initialize_freeze_state(ctx: Context<InitializeFreezeState>) -> Result<()> {
     ctx.accounts.freeze_state.is_frozen = false;
@@ -9,12 +9,6 @@ pub fn initialize_freeze_state(ctx: Context<InitializeFreezeState>) -> Result<()
 }
 /// 冻结账户
 pub fn freeze_account(ctx: Context<FreezeAccount>) -> Result<()> {
-    // 验证管理员权限
-    require!(
-        ctx.accounts.authority_state.is_admin(ctx.accounts.authority.key()),
-        WusdError::Unauthorized
-    );
-
     // 验证账户未被冻结
     require!(
         !ctx.accounts.freeze_state.is_frozen,
@@ -36,12 +30,6 @@ pub fn freeze_account(ctx: Context<FreezeAccount>) -> Result<()> {
 
 /// 解冻账户
 pub fn unfreeze_account(ctx: Context<UnfreezeAccount>) -> Result<()> {
-    // 验证管理员权限
-    require!(
-        ctx.accounts.authority_state.is_admin(ctx.accounts.authority.key()),
-        WusdError::Unauthorized
-    );
-
     // 验证账户已被冻结
     require!(
         ctx.accounts.freeze_state.is_frozen,
@@ -135,10 +123,10 @@ pub struct UnfreezeAccount<'info> {
         bump
     )]
     pub authority_state: Account<'info, AuthorityState>,
-    
+
     pub token_mint: InterfaceAccount<'info, anchor_spl::token_interface::Mint>,
     pub system_program: Program<'info, System>,
-} 
+}
 
 #[event]
 pub struct FreezeAccountEvent {

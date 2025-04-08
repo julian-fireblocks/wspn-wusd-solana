@@ -5,7 +5,7 @@ use anchor_spl::token_2022::{self, mint_to};
 use crate::state::{AuthorityState, MintState, PauseState, AccessRegistryState};
 
 pub fn mint(ctx: Context<MintAccounts>, amount: u64, bump: u8) -> Result<()> {
-    // 极简化验证 - 减少栈使用
+    // 验证金额，确保大于0
     if amount == 0 {
         return Err(error!(WusdError::InvalidAmount));
     }
@@ -14,10 +14,12 @@ pub fn mint(ctx: Context<MintAccounts>, amount: u64, bump: u8) -> Result<()> {
         return Err(error!(WusdError::ContractPaused));
     }
     
-    // 验证调用者是否有铸币权限
+    // 验证操作权限
     require!(
-        ctx.accounts.authority_state.is_minter(ctx.accounts.authority.key()),
-        WusdError::Unauthorized
+        ctx.accounts
+            .access_registry
+            .has_access(ctx.accounts.authority.key()),
+        WusdError::AccessDenied
     );
     
     // 执行铸币 - 极简化CPI调用

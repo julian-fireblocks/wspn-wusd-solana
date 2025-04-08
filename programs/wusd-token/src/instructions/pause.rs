@@ -6,8 +6,8 @@ use crate::state::{AuthorityState, PauseState};
 /// * `ctx` - 上下文
 pub fn pause(ctx: Context<Pause>) -> Result<()> {
     require!(
-        ctx.accounts.authority_state.is_pauser(ctx.accounts.authority.key()),
-        WusdError::NotPauser
+        ctx.accounts.authority_state.is_admin(ctx.accounts.authority.key()),
+        WusdError::Unauthorized
     );
     // 检查当前状态是否已经是暂停状态，避免不必要的状态更新
     if ctx.accounts.pause_state.paused {
@@ -22,8 +22,8 @@ pub fn pause(ctx: Context<Pause>) -> Result<()> {
 /// * `ctx` - 上下文
 pub fn unpause(ctx: Context<Unpause>) -> Result<()> {
     require!(
-        ctx.accounts.authority_state.is_pauser(ctx.accounts.authority.key()),
-        WusdError::NotPauser
+        ctx.accounts.authority_state.is_admin(ctx.accounts.authority.key()),
+        WusdError::Unauthorized
     );
     // 检查当前状态是否已经是非暂停状态，避免不必要的状态更新
     if !ctx.accounts.pause_state.paused {
@@ -40,7 +40,7 @@ pub struct Pause<'info> {
     pub authority: Signer<'info>,
     
     #[account(
-        constraint = authority_state.is_pauser(authority.key()) @ WusdError::NotPauser,
+        constraint = authority_state.is_admin(authority.key()) @ WusdError::Unauthorized,
         seeds = [b"authority", token_mint.key().as_ref()],
         bump
     )]
@@ -63,7 +63,7 @@ pub struct Unpause<'info> {
     pub authority: Signer<'info>,
     
     #[account(
-        constraint = authority_state.is_pauser(authority.key()) @ WusdError::NotPauser,
+        constraint = authority_state.is_admin(authority.key()) @ WusdError::Unauthorized,
         seeds = [b"authority", token_mint.key().as_ref()],
         bump
     )]

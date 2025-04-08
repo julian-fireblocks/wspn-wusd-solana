@@ -1,10 +1,8 @@
+use crate::error::WusdError;
+use crate::state::{AccessRegistryState, AuthorityState, FreezeState, MintState, PauseState};
 use anchor_lang::prelude::*;
 use anchor_spl::token_2022::Token2022;
 use anchor_spl::token_2022::{self, burn as token_burn};
-// 删除未使用的导入
-use crate::error::WusdError;
-use crate::state::{AuthorityState, MintState, AccessRegistryState, PauseState, FreezeState};
-use crate::utils::require_has_access;
 
 /// 销毁WUSD代币
 /// * `ctx` - 销毁上下文
@@ -12,45 +10,13 @@ use crate::utils::require_has_access;
 pub fn burn(ctx: Context<Burn>, amount: u64) -> Result<()> {
     // 验证合约未暂停
     ctx.accounts.pause_state.validate_not_paused()?;
-
-    // 验证调用者权限
-    require!(
-        ctx.accounts.authority.is_signer,
-        WusdError::Unauthorized
-    ); 
-
-    // 验证 token account 的所有者
-    require!(
-        ctx.accounts.token_account.owner == ctx.accounts.authority.key(),
-        WusdError::InvalidOwner
-    );
-
-    // 验证账户未被冻结
-    ctx.accounts.freeze_state.check_frozen()?;
-    
-    // 验证权限状态 - 使用authority_state
-    require!(
-        ctx.accounts.authority_state.is_admin(ctx.accounts.authority.key()) || 
-        ctx.accounts.token_account.owner == ctx.accounts.authority.key(),
-        WusdError::Unauthorized
-    );
-
-    // 验证访问权限 - 简化调用，减少栈使用
-    let pause_state = &ctx.accounts.pause_state;
-    let access_registry = &ctx.accounts.access_registry;
-    require_has_access(
-        ctx.accounts.authority.key(),
-        true, // 销毁是借记操作
-        Some(amount),
-        pause_state,
-        Some(access_registry),
-    )?;
-
+    // 验证金额有效性
+    require!(amount > 0, WusdError::InvalidAmount);
     // 验证余额充足
     require!(
         ctx.accounts.token_account.amount >= amount,
         WusdError::InsufficientBalance
-    );
+    ); 
 
     // 执行销毁操作
     token_burn(
@@ -62,7 +28,7 @@ pub fn burn(ctx: Context<Burn>, amount: u64) -> Result<()> {
                 authority: ctx.accounts.authority.to_account_info(),
             },
         ),
-        amount
+        amount,
     )?;
 
     emit!(BurnEvent {
@@ -71,29 +37,27 @@ pub fn burn(ctx: Context<Burn>, amount: u64) -> Result<()> {
     });
 
     Ok(())
-} 
+}
 
 #[derive(Accounts)]
 pub struct Burn<'info> {
     #[account(
         mut,
         seeds = [b"authority", mint.key().as_ref()],
-        bump
+        bump,
+        constraint = authority_state.is_admin(authority.key()) @ WusdError::Unauthorized
     )]
-    pub authority_state: Account<'info, AuthorityState>, 
-    #[account(mut)]
-    pub mint_authority: Signer<'info>,
+    pub authority_state: Account<'info, AuthorityState>,
     #[account(mut)]
     pub authority: Signer<'info>,
     #[account(mut)]
     pub mint: InterfaceAccount<'info, anchor_spl::token_interface::Mint>,
     #[account(
         mut,
-        constraint = token_account.owner == authority.key() @ WusdError::InvalidOwner,
         constraint = token_account.mint == mint.key() @ WusdError::InvalidMint
     )]
     pub token_account: InterfaceAccount<'info, anchor_spl::token_interface::TokenAccount>,
-    pub token_program: Program<'info, Token2022>, 
+    pub token_program: Program<'info, Token2022>,
     pub mint_state: Account<'info, MintState>,
     #[account(
         seeds = [b"pause_state", mint.key().as_ref()],
@@ -113,7 +77,7 @@ pub struct Burn<'info> {
         constraint = !freeze_state.is_frozen @ WusdError::AccountFrozen
     )]
     pub freeze_state: Account<'info, FreezeState>,
-} 
+}
 
 /// 销毁事件，记录代币销毁的详细信息
 #[event]
