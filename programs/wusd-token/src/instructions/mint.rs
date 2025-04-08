@@ -1,44 +1,44 @@
+use crate::error::WusdError;
+use crate::state::{AuthorityState, MintState, PauseState};
 use anchor_lang::prelude::*;
-use crate::error::WusdError;   
 use anchor_spl::token_2022::Token2022;
-use anchor_spl::token_2022::{self, mint_to}; 
-use crate::state::{AuthorityState, MintState, PauseState, AccessRegistryState};
+use anchor_spl::token_2022::{self, mint_to};
 
 pub fn mint(ctx: Context<MintAccounts>, amount: u64, bump: u8) -> Result<()> {
     // 验证金额，确保大于0
     if amount == 0 {
         return Err(error!(WusdError::InvalidAmount));
     }
-    
+
     if ctx.accounts.pause_state.paused {
         return Err(error!(WusdError::ContractPaused));
     }
-    
-    // 验证操作权限
+
+    // 验证铸币权限
     require!(
         ctx.accounts
-            .access_registry
-            .has_access(ctx.accounts.authority.key()),
-        WusdError::AccessDenied
+            .authority_state
+            .is_minter(ctx.accounts.authority.key()),
+        WusdError::Unauthorized
     );
-    
+
     // 执行铸币 - 极简化CPI调用
     let mint_key = ctx.accounts.token_mint.key();
     let seeds = &[b"authority", mint_key.as_ref(), &[bump]];
-    
+
     let cpi_accounts = token_2022::MintTo {
         mint: ctx.accounts.token_mint.to_account_info(),
         to: ctx.accounts.token_account.to_account_info(),
         authority: ctx.accounts.authority_state.to_account_info(),
     };
-    
+
     mint_to(
         CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
             cpi_accounts,
             &[seeds],
         ),
-        amount
+        amount,
     )?;
 
     // 发出铸币事件 - 简化事件参数
@@ -79,11 +79,6 @@ pub struct MintAccounts<'info> {
         bump
     )]
     pub pause_state: Account<'info, PauseState>,
-    #[account(
-        seeds = [b"access_registry"],
-        bump
-    )]
-    pub access_registry: Account<'info, AccessRegistryState>,
     pub system_program: Program<'info, System>,
 }
 

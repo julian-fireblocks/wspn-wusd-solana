@@ -1,5 +1,5 @@
-use anchor_lang::prelude::*; 
 use crate::error::WusdError;
+use anchor_lang::prelude::*;
 
 /// 授权额度状态账户，存储代币授权信息
 #[account]
@@ -31,7 +31,9 @@ impl AllowanceState {
     /// 增加授权额度
     /// * `added_value` - 增加的额度
     pub fn increase_allowance(&mut self, added_value: u64) -> Result<()> {
-        self.amount = self.amount.checked_add(added_value)
+        self.amount = self
+            .amount
+            .checked_add(added_value)
             .ok_or(error!(crate::error::WusdError::InvalidAmount))?;
         Ok(())
     }
@@ -39,8 +41,13 @@ impl AllowanceState {
     /// 减少授权额度
     /// * `subtracted_value` - 减少的额度
     pub fn decrease_allowance(&mut self, subtracted_value: u64) -> Result<()> {
-        require!(self.amount >= subtracted_value, crate::error::WusdError::InvalidAmount);
-        self.amount = self.amount.checked_sub(subtracted_value)
+        require!(
+            self.amount >= subtracted_value,
+            crate::error::WusdError::InvalidAmount
+        );
+        self.amount = self
+            .amount
+            .checked_sub(subtracted_value)
             .ok_or(error!(crate::error::WusdError::InvalidAmount))?;
         Ok(())
     }
@@ -48,7 +55,10 @@ impl AllowanceState {
     /// 验证授权额度是否足够
     /// * `amount` - 待验证的金额
     pub fn validate_allowance(&self, amount: u64) -> Result<()> {
-        require!(self.amount >= amount, crate::error::WusdError::InvalidAmount);
+        require!(
+            self.amount >= amount,
+            crate::error::WusdError::InvalidAmount
+        );
         Ok(())
     }
 }
@@ -76,7 +86,13 @@ impl PermitState {
 
     /// 初始化签名许可状态
     /// * `owner` - 所有者地址
-    pub fn initialize(owner: Pubkey, spender: Pubkey, amount: u64, expiration: i64, bump: u8) -> Self {
+    pub fn initialize(
+        owner: Pubkey,
+        spender: Pubkey,
+        amount: u64,
+        expiration: i64,
+        bump: u8,
+    ) -> Self {
         Self {
             owner,
             spender,
@@ -95,7 +111,10 @@ impl PermitState {
     /// 验证随机数
     /// * `expected_nonce` - 期望的随机数
     pub fn validate_nonce(&self, expected_nonce: u64) -> Result<()> {
-        require!(self.nonce == expected_nonce, crate::error::WusdError::InvalidNonce);
+        require!(
+            self.nonce == expected_nonce,
+            crate::error::WusdError::InvalidNonce
+        );
         Ok(())
     }
 }
@@ -105,16 +124,28 @@ impl PermitState {
 pub struct AuthorityState {
     /// 管理员地址
     pub admin: Pubkey,
+    /// 铸币角色地址
+    pub minter_role: Pubkey,
+    /// 销毁角色地址
+    pub burner_role: Pubkey,
+    /// 暂停角色地址
+    pub pauser_role: Pubkey,
+    /// 冻结角色地址
+    pub freezer_role: Pubkey,
 }
 
 impl AuthorityState {
     /// 权限管理状态账户大小
-    /// discriminator + admin
-    pub const SIZE: usize = 8 + 32;
+    /// discriminator + admin + minter_role + burner_role + pauser_role
+    pub const SIZE: usize = 8 + 32 + 32 + 32 + 32 + 32;
 
     pub fn initialize(admin: Pubkey) -> Self {
         Self {
-            admin
+            admin,
+            minter_role: Pubkey::default(),
+            burner_role: Pubkey::default(),
+            pauser_role: Pubkey::default(),
+            freezer_role: Pubkey::default(),
         }
     }
 
@@ -128,96 +159,53 @@ impl AuthorityState {
         self.admin = new_admin;
         Ok(())
     }
-}
 
-/// 访问权限注册表状态
-#[account]
-#[derive(Default)]
-pub struct AccessRegistryState {
-    /// 管理员地址
-    pub authority: Pubkey,
-    /// 是否已初始化
-    pub initialized: bool,
-    /// 操作员列表 (使用固定大小数组代替 Vec 来避免序列化问题)
-    pub operators: [Pubkey; 3],  // 使用3个操作员以减少栈使用
-    /// 当前操作员数量
-    pub operator_count: u8,
-}
-
-impl AccessRegistryState {
-    pub const SIZE: usize = 8 + // discriminator
-        32 + // authority
-        1 + // operator_count
-        (32 * 3) + 
-        1; // initialized
-
-    pub fn new(authority: Pubkey) -> Self {
-        Self {
-            authority,
-            operator_count: 0,
-            operators: [Pubkey::default(); 3],
-            initialized: false,
-        }
-    }
-
-    /// 添加操作员
-    pub fn add_operator(&mut self, operator: Pubkey) -> Result<()> {
-        // 检查是否已达到最大操作员数量
-        require!(
-            self.operator_count < 3,
-            WusdError::TooManyOperators
-        );
-
-        // 检查操作员是否已存在
-        for i in 0..self.operator_count as usize {
-            if self.operators[i] == operator {
-                return Ok(());  // 操作员已存在，直接返回
-            }
-        }
-
-        // 添加新操作员
-        self.operators[self.operator_count as usize] = operator;
-        self.operator_count += 1;
+    /// 设置铸币角色
+    pub fn set_minter_role(&mut self, minter: Pubkey) -> Result<()> {
+        require!(minter != Pubkey::default(), WusdError::InvalidAddress);
+        self.minter_role = minter;
         Ok(())
     }
 
-    /// 移除操作员
-    pub fn remove_operator(&mut self, operator: Pubkey) -> Result<()> {
-        let mut found = false;
-        for i in 0..self.operator_count as usize {
-            if self.operators[i] == operator {
-                // 找到要移除的操作员
-                found = true;
-                // 将后面的操作员向前移动
-                for j in i..self.operator_count as usize - 1 {
-                    self.operators[j] = self.operators[j + 1];
-                }
-                // 清除最后一个位置
-                self.operators[self.operator_count as usize - 1] = Pubkey::default();
-                self.operator_count -= 1;
-                break;
-            }
-        }
-
-        require!(found, WusdError::OperatorNotFound);
+    /// 设置销毁角色
+    pub fn set_burner_role(&mut self, burner: Pubkey) -> Result<()> {
+        require!(burner != Pubkey::default(), WusdError::InvalidAddress);
+        self.burner_role = burner;
         Ok(())
     }
 
-    pub fn has_access(&self, user: Pubkey) -> bool {
-        // 管理员拥有所有权限
-        if self.authority == user {
-            return true;
-        }
+    /// 设置冻结角色
+    pub fn set_freezer_role(&mut self, freezer: Pubkey) -> Result<()> {
+        require!(freezer != Pubkey::default(), WusdError::InvalidAddress);
+        self.freezer_role = freezer;
+        Ok(())
+    }
 
-        // 检查是否为操作员
-        for i in 0..self.operator_count as usize {
-            if self.operators[i] == user {
-                return true;
-            }
-        }
+    /// 设置暂停角色
+    pub fn set_pauser_role(&mut self, pauser: Pubkey) -> Result<()> {
+        require!(pauser != Pubkey::default(), WusdError::InvalidAddress);
+        self.pauser_role = pauser;
+        Ok(())
+    }
 
-        // 如果不是管理员也不是操作员，则没有权限
-        false
+    /// 验证铸币角色
+    pub fn is_minter(&self, user: Pubkey) -> bool {
+        self.minter_role == user
+    }
+
+    /// 验证销毁角色
+    pub fn is_burner(&self, user: Pubkey) -> bool {
+        self.burner_role == user
+    }
+
+    /// 验证暂停角色
+    pub fn is_pauser(&self, user: Pubkey) -> bool {
+        self.pauser_role == user
+    }
+
+    /// 验证是否为冻结角色
+    pub fn is_freezer(&self, user: Pubkey) -> bool {
+        self.freezer_role == user
     }
 }
 
@@ -233,7 +221,7 @@ pub struct MintState {
 impl MintState {
     pub const SIZE: usize = 8 + // discriminator
         32 + // mint
-        1;  // decimals
+        1; // decimals
 }
 
 /// 暂停状态账户，用于控制合约的暂停/恢复
@@ -244,7 +232,7 @@ pub struct PauseState {
 }
 
 impl PauseState {
-    pub const SIZE: usize = 8 + 1;  // paused     /// 设置暂停状态
+    pub const SIZE: usize = 8 + 1; // paused     /// 设置暂停状态
     pub fn set_paused(&mut self, paused: bool) {
         self.paused = paused;
     }
@@ -268,8 +256,7 @@ pub struct FreezeState {
 }
 
 impl FreezeState {
-    pub const SIZE: usize = 8 + // discriminator
-        1;  // is_frozen
+    pub const SIZE: usize = 8 + 1; // is_frozen
 
     /// 检查账户是否被冻结
     pub fn check_frozen(&self) -> Result<()> {

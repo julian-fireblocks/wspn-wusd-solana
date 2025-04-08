@@ -1,5 +1,5 @@
 use crate::error::WusdError;
-use crate::state::{AccessRegistryState, AuthorityState, FreezeState, MintState, PauseState};
+use crate::state::{AuthorityState, FreezeState, MintState, PauseState};
 use anchor_lang::prelude::*;
 use anchor_spl::token_2022::Token2022;
 use anchor_spl::token_2022::{self, burn as token_burn};
@@ -45,7 +45,7 @@ pub struct Burn<'info> {
         mut,
         seeds = [b"authority", mint.key().as_ref()],
         bump,
-        constraint = authority_state.is_admin(authority.key()) @ WusdError::Unauthorized
+        constraint = authority_state.is_burner(authority.key()) @ WusdError::Unauthorized
     )]
     pub authority_state: Account<'info, AuthorityState>,
     #[account(mut)]
@@ -64,13 +64,7 @@ pub struct Burn<'info> {
         bump,
         constraint = !pause_state.paused @ WusdError::ContractPaused
     )]
-    pub pause_state: Account<'info, PauseState>,
-    #[account(
-        seeds = [b"access_registry"],
-        bump,
-        constraint = access_registry.initialized @ WusdError::AccessRegistryNotInitialized
-    )]
-    pub access_registry: Account<'info, AccessRegistryState>,
+    pub pause_state: Account<'info, PauseState>, 
     #[account(
         seeds = [b"freeze", token_account.key().as_ref()],
         bump,

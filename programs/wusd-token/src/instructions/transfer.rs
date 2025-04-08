@@ -1,7 +1,5 @@
 use crate::error::WusdError;
-use crate::state::{
-    AccessRegistryState, AuthorityState, FreezeState, MintState, PauseState, PermitState,
-};
+use crate::state::{AuthorityState, FreezeState, MintState, PauseState, PermitState};
 use anchor_lang::prelude::*;
 use anchor_spl::token_2022::{self, transfer_checked, Token2022};
 use anchor_spl::token_interface::TokenAccount;
@@ -12,7 +10,7 @@ use anchor_spl::token_interface::TokenAccount;
 pub fn transfer(ctx: Context<Transfer>, amount: u64) -> Result<()> {
     // 验证系统未被暂停
     ctx.accounts.pause_state.validate_not_paused()?;
-    require!(amount > 0, WusdError::InvalidAmount); 
+    require!(amount > 0, WusdError::InvalidAmount);
 
     // 执行转账
     transfer_checked(
@@ -59,7 +57,7 @@ pub fn transfer_from(ctx: Context<TransferFrom>, amount: u64) -> Result<()> {
     ctx.accounts.pause_state.validate_not_paused()?;
 
     // 验证金额大于0
-    require!(amount > 0, WusdError::InvalidAmount); 
+    require!(amount > 0, WusdError::InvalidAmount);
 
     // 直接使用spender作为authority执行转账
     transfer_checked(
@@ -132,12 +130,6 @@ pub struct TransferFrom<'info> {
         constraint = !pause_state.paused @ WusdError::ContractPaused
     )]
     pub pause_state: Account<'info, PauseState>,
-    #[account(
-        seeds = [b"access_registry"],
-        bump,
-        constraint = access_registry.initialized @ WusdError::AccessRegistryNotInitialized
-    )]
-    pub access_registry: Account<'info, AccessRegistryState>,
     pub token_program: Program<'info, Token2022>,
     #[account(mut)]
     pub token_mint: InterfaceAccount<'info, anchor_spl::token_interface::Mint>,
@@ -187,11 +179,6 @@ pub struct Transfer<'info> {
         bump,
     )]
     pub pause_state: Box<Account<'info, PauseState>>,
-    #[account(
-        seeds = [b"access_registry"],
-        bump,
-    )]
-    pub access_registry: Box<Account<'info, AccessRegistryState>>,
     #[account(
         seeds = [b"freeze", from_token.key().as_ref()],
         bump,

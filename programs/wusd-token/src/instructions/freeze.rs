@@ -81,9 +81,8 @@ pub struct FreezeAccount<'info> {
         seeds = [b"freeze", account.key().as_ref()],
         bump
     )]
-    pub freeze_state: Account<'info, FreezeState>,
-
-    /// 要冻结的账户
+    pub freeze_state: Account<'info, FreezeState>, 
+   
     /// CHECK: 这个账户仅用于生成PDA种子
     pub account: AccountInfo<'info>,
 
@@ -111,9 +110,8 @@ pub struct UnfreezeAccount<'info> {
         constraint = freeze_state.is_frozen @ WusdError::AccountNotFrozen
     )]
     /// CHECK: 这个账户的安全性由FreezeState结构和程序逻辑保证
-    pub freeze_state: Account<'info, FreezeState>,
-
-    /// 要解冻的账户
+    pub freeze_state: Account<'info, FreezeState>, 
+  
     /// CHECK: 这个账户仅用于生成PDA种子
     pub account: AccountInfo<'info>,
 

@@ -1,8 +1,7 @@
-pub mod mint; 
-pub mod burn;
-pub mod transfer;
-pub mod permit;
-pub mod operator;
-pub mod pause;
-pub mod freeze;
 pub mod admin;
+pub mod burn;
+pub mod freeze;
+pub mod mint;
+pub mod pause;
+pub mod permit;
+pub mod transfer;
