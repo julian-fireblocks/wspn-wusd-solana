@@ -40,7 +40,6 @@ pub fn burn(ctx: Context<Burn>, amount: u64) -> Result<()> {
 #[derive(Accounts)]
 pub struct Burn<'info> {
     #[account(
-        mut,
         seeds = [b"authority", mint.key().as_ref()],
         bump,
         constraint = authority_state.is_burner(authority.key()) @ WusdError::Unauthorized
@@ -48,7 +47,6 @@ pub struct Burn<'info> {
     pub authority_state: Account<'info, AuthorityState>,
     #[account(mut)]
     pub authority: Signer<'info>,
-    #[account(mut)]
     pub mint: InterfaceAccount<'info, anchor_spl::token_interface::Mint>,
     #[account(
         mut,

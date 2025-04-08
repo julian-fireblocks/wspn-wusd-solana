@@ -58,19 +58,16 @@ pub struct MintAccounts<'info> {
     pub token_account: InterfaceAccount<'info, anchor_spl::token_interface::TokenAccount>,
     pub token_program: Program<'info, Token2022>,
     #[account(
-        mut,
         seeds = [b"authority", token_mint.key().as_ref()],
         bump
     )]
     pub authority_state: Account<'info, AuthorityState>,
     #[account(
-        mut,
         seeds = [b"mint_state", token_mint.key().as_ref()],
         bump
     )]
     pub mint_state: Account<'info, MintState>,
     #[account(
-        mut,
         seeds = [b"pause_state", token_mint.key().as_ref()],
         bump
     )]

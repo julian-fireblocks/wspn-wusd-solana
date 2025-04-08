@@ -117,7 +117,6 @@ pub struct TransferFrom<'info> {
         has_one = spender,
     )]
     pub permit: Account<'info, PermitState>,
-    #[account(mut)]
     pub mint_state: Box<Account<'info, MintState>>,
     #[account(
         seeds = [b"pause_state", token_mint.key().as_ref()],
@@ -126,7 +125,6 @@ pub struct TransferFrom<'info> {
     )]
     pub pause_state: Account<'info, PauseState>,
     pub token_program: Program<'info, Token2022>,
-    #[account(mut)]
     pub token_mint: InterfaceAccount<'info, anchor_spl::token_interface::Mint>,
     #[account(
         seeds = [b"freeze", from_token.key().as_ref()],
@@ -162,7 +160,6 @@ pub struct Transfer<'info> {
     )]
     pub to_token: Box<InterfaceAccount<'info, TokenAccount>>,
     pub token_program: Program<'info, Token2022>,
-    #[account(mut)]
     pub token_mint: InterfaceAccount<'info, anchor_spl::token_interface::Mint>,
     #[account(
         seeds = [b"authority", token_mint.key().as_ref()],

@@ -101,7 +101,6 @@ pub struct Permit<'info> {
     )]
     pub permit_state: Account<'info, PermitState>,
 
-    #[account(mut)]
     pub mint_state: Box<Account<'info, MintState>>,
 
     #[account(
