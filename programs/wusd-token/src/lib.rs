@@ -1,7 +1,6 @@
 //! WUSD Token 程序  
 mod error;
 mod state;
-mod access;
 mod instructions; 
 
 use crate::error::WusdError;
