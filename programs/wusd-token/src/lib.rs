@@ -9,13 +9,13 @@ use anchor_spl::token_interface::Mint;
 use spl_token_2022::instruction::AuthorityType;    
 use state::{AuthorityState, MintState, PauseState};
 
+use instructions::roles::*; 
 use instructions::mint::*; 
 use instructions::burn::*;
 use instructions::transfer::*;
 use instructions::permit::*; 
 use instructions::pause::*;
 use instructions::freeze::*;
-use instructions::admin::*; 
 
 declare_id!("8nBbkdsTkqbrnrbVTUxyciQNvT6Q5B3pZkPQmP3nnuwU");
 
@@ -115,6 +115,16 @@ pub mod wusd_token {
     pub fn initialize_freeze_state(ctx: Context<InitializeFreezeState>) -> Result<()> {
         instructions::freeze::initialize_freeze_state(ctx)
     }
+
+    /// 转移管理员权限
+    pub fn transfer_admin(ctx: Context<TransferAdmin>, new_admin: Pubkey) -> Result<()> {
+        instructions::roles::transfer_admin(ctx, new_admin)
+    }  
+    
+    /// 设置角色
+    pub fn set_role(ctx: Context<SetRole>, role_type: RoleType, new_role: Pubkey) -> Result<()> {
+        instructions::roles::set_role(ctx, role_type, new_role)
+    }
     
     /// 铸造WUSD代币 
     pub fn mint(ctx: Context<MintAccounts>, amount: u64, bump: u8) -> Result<()> {
@@ -149,13 +159,7 @@ pub mod wusd_token {
     /// 销毁WUSD代币
     pub fn burn(ctx: Context<Burn>, amount: u64) -> Result<()> {
         instructions::burn::burn(ctx, amount)
-    }  
-
-    /// 转移管理员权限
-    pub fn transfer_admin(ctx: Context<TransferAdmin>, new_admin: Pubkey) -> Result<()> {
-        instructions::admin::transfer_admin(ctx, new_admin)
-    }  
-
+    }   
     /// 冻结账户
     pub fn freeze_account(ctx: Context<FreezeAccount>) -> Result<()> { 
         instructions::freeze::freeze_account(ctx)
@@ -164,7 +168,8 @@ pub mod wusd_token {
     /// 解冻账户
     pub fn unfreeze_account(ctx: Context<UnfreezeAccount>) -> Result<()> {
         instructions::freeze::unfreeze_account(ctx) 
-    } 
+    }   
+    
 }
 
 #[derive(Accounts)]

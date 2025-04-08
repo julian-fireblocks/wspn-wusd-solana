@@ -81,3 +81,4 @@ pub struct BurnEvent {
     /// 销毁数量，被销毁的代币数量
     pub amount: u64,
 }
+

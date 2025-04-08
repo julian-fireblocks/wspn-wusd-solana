@@ -1,4 +1,4 @@
-pub mod admin;
+pub mod roles;
 pub mod burn;
 pub mod freeze;
 pub mod mint;
