@@ -10,10 +10,6 @@ pub fn mint(ctx: Context<MintAccounts>, amount: u64, bump: u8) -> Result<()> {
         return Err(error!(WusdError::InvalidAmount));
     }
 
-    if ctx.accounts.pause_state.paused {
-        return Err(error!(WusdError::ContractPaused));
-    }
-
     // 验证铸币权限
     require!(
         ctx.accounts

@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_2022::Token2022; 
 use crate::error::WusdError;  
-use crate::state::{MintState, PermitState, AllowanceState};
+use crate::state::{MintState, PermitState, AllowanceState, PauseState};
 
 /// 处理授权许可请求，允许代币持有者授权其他账户使用其代币
 /// 
@@ -15,10 +15,21 @@ pub fn permit(ctx: Context<Permit>, params: PermitParams) -> Result<()> {
     // 验证基本参数
     require!(params.amount > 0, WusdError::InvalidAmount);
     
-    // 验证mint状态
+    // 验证deadline有效性
+    let current_time = Clock::get()?.unix_timestamp;
+    require!(params.deadline > current_time, WusdError::ExpiredPermit);
+    
+    // 验证mint状态和permit_state
     require!(
         ctx.accounts.mint_state.mint == ctx.accounts.token_program.key(),
         WusdError::InvalidMint
+    );
+    
+    // 验证permit_state
+    require!(
+        ctx.accounts.permit_state.owner == ctx.accounts.owner.key() &&
+        ctx.accounts.permit_state.spender == ctx.accounts.spender.key(),
+        WusdError::InvalidPermit
     );
     
     // 初始化 permit_state
@@ -92,6 +103,13 @@ pub struct Permit<'info> {
 
     #[account(mut)]
     pub mint_state: Box<Account<'info, MintState>>,
+
+    #[account(
+        seeds = [b"pause_state", token_program.key().as_ref()],
+        bump,
+        constraint = !pause_state.paused @ WusdError::ContractPaused
+    )]
+    pub pause_state: Account<'info, PauseState>,
 
     pub token_program: Program<'info, Token2022>,
     pub system_program: Program<'info, System>,

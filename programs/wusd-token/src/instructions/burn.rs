@@ -8,8 +8,6 @@ use anchor_spl::token_2022::{self, burn as token_burn};
 /// * `ctx` - 销毁上下文
 /// * `amount` - 销毁数量
 pub fn burn(ctx: Context<Burn>, amount: u64) -> Result<()> {
-    // 验证合约未暂停
-    ctx.accounts.pause_state.validate_not_paused()?;
     // 验证金额有效性
     require!(amount > 0, WusdError::InvalidAmount);
     // 验证余额充足

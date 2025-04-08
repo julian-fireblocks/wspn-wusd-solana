@@ -8,8 +8,6 @@ use anchor_spl::token_interface::TokenAccount;
 /// * `ctx` - 转账上下文
 /// * `amount` - 转账数量
 pub fn transfer(ctx: Context<Transfer>, amount: u64) -> Result<()> {
-    // 验证系统未被暂停
-    ctx.accounts.pause_state.validate_not_paused()?;
     require!(amount > 0, WusdError::InvalidAmount);
 
     // 执行转账
@@ -24,7 +22,7 @@ pub fn transfer(ctx: Context<Transfer>, amount: u64) -> Result<()> {
             },
         ),
         amount,
-        ctx.accounts.token_mint.decimals, // 使用token_mint中的小数位数
+        ctx.accounts.token_mint.decimals,
     )?;
 
     // 发送转账事件 - 使用更简洁的方式处理Pubkey，减少栈使用
@@ -52,9 +50,6 @@ pub fn transfer_from(ctx: Context<TransferFrom>, amount: u64) -> Result<()> {
         ctx.accounts.permit.amount >= amount,
         WusdError::InsufficientAllowance
     );
-
-    // 验证系统未暂停状态
-    ctx.accounts.pause_state.validate_not_paused()?;
 
     // 验证金额大于0
     require!(amount > 0, WusdError::InvalidAmount);
@@ -177,6 +172,7 @@ pub struct Transfer<'info> {
     #[account(
         seeds = [b"pause_state", from_token.mint.as_ref()],
         bump,
+        constraint = !pause_state.paused @ WusdError::ContractPaused
     )]
     pub pause_state: Box<Account<'info, PauseState>>,
     #[account(
