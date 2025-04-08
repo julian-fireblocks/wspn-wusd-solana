@@ -127,13 +127,13 @@ pub struct TransferFrom<'info> {
     pub token_program: Program<'info, Token2022>,
     pub token_mint: InterfaceAccount<'info, anchor_spl::token_interface::Mint>,
     #[account(
-        seeds = [b"freeze", from_token.key().as_ref()],
+        seeds = [b"freeze", from_token.key().as_ref(), token_mint.key().as_ref()],
         bump,
         constraint = !from_freeze_state.is_frozen @ WusdError::AccountFrozen
     )]
     pub from_freeze_state: Account<'info, FreezeState>,
     #[account(
-        seeds = [b"freeze", to_token.key().as_ref()],
+        seeds = [b"freeze", to_token.key().as_ref(), token_mint.key().as_ref()],
         bump,
         constraint = !to_freeze_state.is_frozen @ WusdError::AccountFrozen
     )]
@@ -173,13 +173,13 @@ pub struct Transfer<'info> {
     )]
     pub pause_state: Box<Account<'info, PauseState>>,
     #[account(
-        seeds = [b"freeze", from_token.key().as_ref()],
+        seeds = [b"freeze", from_token.key().as_ref(), token_mint.key().as_ref()],
         bump,
         constraint = !from_freeze_state.is_frozen @ WusdError::AccountFrozen
     )]
     pub from_freeze_state: Box<Account<'info, FreezeState>>,
     #[account(
-        seeds = [b"freeze", to_token.key().as_ref()],
+        seeds = [b"freeze", to_token.key().as_ref(), token_mint.key().as_ref()],
         bump,
         constraint = !to_freeze_state.is_frozen @ WusdError::AccountFrozen
     )]

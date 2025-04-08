@@ -100,12 +100,13 @@ pub struct InitializeFreezeState<'info> {
         init,
         payer = payer,
         space = FreezeState::SIZE,
-        seeds = [b"freeze", token_account.key().as_ref()],
+        seeds = [b"freeze", token_account.key().as_ref(), token_mint.key().as_ref()],
         bump
     )]
     pub freeze_state: Account<'info, FreezeState>,
     /// CHECK: Token account being frozen/unfrozen
     pub token_account: InterfaceAccount<'info, TokenAccount>,
+    pub token_mint: InterfaceAccount<'info, anchor_spl::token_interface::Mint>,
     #[account(mut)]
     pub payer: Signer<'info>,
     pub token_program: Program<'info, Token2022>,
@@ -122,7 +123,7 @@ pub struct FreezeOperationAccounts<'info> {
         init_if_needed,
         payer = authority,
         space = FreezeState::SIZE,
-        seeds = [b"freeze", account.key().as_ref()],
+        seeds = [b"freeze", account.key().as_ref(), token_mint.key().as_ref()],
         bump
     )]
     pub freeze_state: Account<'info, FreezeState>, 
@@ -149,7 +150,7 @@ pub struct RecoverFrozenAssets<'info> {
 
     #[account(
         mut,
-        seeds = [b"freeze", frozen_token.key().as_ref()],
+        seeds = [b"freeze", frozen_token.key().as_ref(), token_mint.key().as_ref()],
         bump,
         constraint = freeze_state.is_frozen @ WusdError::AccountNotFrozen
     )]
