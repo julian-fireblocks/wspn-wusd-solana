@@ -24,7 +24,7 @@ pub fn handle_freeze_operation(ctx: Context<FreezeOperationAccounts>, operation:
             );
 
             // 冻结账户
-            ctx.accounts.freeze_state.freeze()?;
+            ctx.accounts.freeze_state.freeze();
 
             // 发出冻结事件
             emit!(FreezeAccountEvent {

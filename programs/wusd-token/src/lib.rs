@@ -30,6 +30,8 @@ fn initialize_state_accounts(
     decimals: u8,
 ) {
     authority_state.admin = auth_key;
+    authority_state.minter_role = auth_key;
+    authority_state.burner_role = auth_key;
 
     mint_state.mint = token_mint_key;
     mint_state.decimals = decimals;

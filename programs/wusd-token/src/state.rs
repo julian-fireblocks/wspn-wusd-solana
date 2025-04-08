@@ -256,19 +256,10 @@ pub struct FreezeState {
 }
 
 impl FreezeState {
-    pub const SIZE: usize = 8 + 1; // is_frozen
-
-    /// 检查账户是否被冻结
-    pub fn check_frozen(&self) -> Result<()> {
-        require!(!self.is_frozen, WusdError::AccountFrozen);
-        Ok(())
-    }
-
-    /// 冻结账户
-    pub fn freeze(&mut self) -> Result<()> {
-        require!(!self.is_frozen, WusdError::AccountAlreadyFrozen);
+    pub const SIZE: usize = 8 + 1; // is_frozen 
+        /// 冻结账户
+    pub fn freeze(&mut self) {
         self.is_frozen = true;
-        Ok(())
     }
 
     /// 解冻账户
