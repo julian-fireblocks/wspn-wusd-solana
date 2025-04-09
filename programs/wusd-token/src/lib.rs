@@ -2,12 +2,6 @@
 mod error;
 mod state;
 mod instructions;  
- 
-use anchor_lang::prelude::*;
-use anchor_spl::token_2022; 
-use anchor_spl::token_interface::Mint;
-use spl_token_2022::instruction::AuthorityType;    
-use state::{AuthorityState, MintState, PauseState};
 
 use instructions::roles::*; 
 use instructions::mint::*; 
@@ -16,6 +10,11 @@ use instructions::transfer::*;
 use instructions::permit::*; 
 use instructions::pause::*;
 use instructions::freeze::*;
+use anchor_lang::prelude::*;
+use anchor_spl::token_2022; 
+use anchor_spl::token_interface::Mint;
+use spl_token_2022::instruction::AuthorityType;    
+use state::{AuthorityState, MintState, PauseState}; 
 
 declare_id!("4xPf5n8CbNUm8AT5DVgdWaPT3nVTPKU9oGjreiGBK3fB");
 
