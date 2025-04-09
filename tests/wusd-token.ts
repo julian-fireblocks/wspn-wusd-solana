@@ -11,16 +11,29 @@ import {
   TOKEN_2022_PROGRAM_ID,
   createInitializeMint2Instruction,
   createAssociatedTokenAccountInstruction,
-  getAssociatedTokenAddressSync,
-  createApproveInstruction,
+  getAssociatedTokenAddressSync, 
 } from "@solana/spl-token";
 import { WusdToken } from "../target/types/wusd_token";
 import { assert } from "chai";
 
 describe("WUSD Token Test", () => {
   // 1. 首先定义所有变量
-  const provider = anchor.AnchorProvider.env();
-  anchor.setProvider(provider);
+  let provider: anchor.AnchorProvider;
+
+  before(async () => {
+    try {
+      provider = anchor.AnchorProvider.env();
+      if (!provider) {
+        throw new Error("AnchorProvider not properly initialized");
+      }
+      anchor.setProvider(provider);
+      console.log("\n=== Provider Initialization ===\nProvider wallet:", provider.wallet.publicKey.toString());
+    } catch (error) {
+      console.error("\nError during provider initialization:", error);
+      throw error;
+    }
+  });
+
 
   // 确保程序ID已正确初始化
   const programId = new PublicKey(
@@ -39,6 +52,8 @@ describe("WUSD Token Test", () => {
   // 定义关键账户
   let mintKeypair: Keypair;
   let recipientKeypair: Keypair;
+  let minterKeypair: Keypair;
+  let pauserKeypair: Keypair;
 
   // 定义PDA账户
   let authorityPda: PublicKey;
@@ -54,11 +69,14 @@ describe("WUSD Token Test", () => {
 
   before(async () => {
     try {
+      console.log("\n=== Starting Test Setup ===");
       console.log("Starting initialization with simplified approach...");
 
       // 1. 生成密钥对
       mintKeypair = anchor.web3.Keypair.generate();
       recipientKeypair = anchor.web3.Keypair.generate();
+      minterKeypair = anchor.web3.Keypair.generate();
+      pauserKeypair = anchor.web3.Keypair.generate();
 
       console.log("Generated keypairs:");
       console.log("Mint keypair:", mintKeypair.publicKey.toString());
@@ -147,181 +165,285 @@ describe("WUSD Token Test", () => {
         const rentExemptAmount =
           await provider.connection.getMinimumBalanceForRentExemption(mintSize);
 
-        // 使用简单直接的方法创建Token 2022账户
+        // 检查mint账户是否已存在
+        const existingMintAccount = await provider.connection.getAccountInfo(mintKeypair.publicKey);
+        
+        // 只有当mint账户不存在时才创建
+        if (!existingMintAccount) {
+          try {
+            // 创建铸币账户指令
+            const createAccountIx = SystemProgram.createAccount({
+              fromPubkey: provider.wallet.publicKey,
+              newAccountPubkey: mintKeypair.publicKey,
+              space: mintSize,
+              lamports: rentExemptAmount,
+              programId: TOKEN_2022_PROGRAM_ID,
+            });
+
+            // 添加Token铸币初始化指令
+            const createMintIx = createInitializeMint2Instruction(
+              mintKeypair.publicKey,
+              6, // 6位小数
+              provider.wallet.publicKey, // 先使用钱包作为铸币权限，后续再转移给PDA
+              null,
+              TOKEN_2022_PROGRAM_ID
+            );
+
+            // 创建交易并添加指令
+            const tx = new anchor.web3.Transaction()
+              .add(createAccountIx)
+              .add(createMintIx);
+
+            // 获取最新区块哈希
+            const { blockhash } = await provider.connection.getLatestBlockhash();
+            tx.recentBlockhash = blockhash;
+            tx.feePayer = provider.wallet.publicKey;
+
+            // 签名交易
+            tx.partialSign(mintKeypair);
+
+            console.log("Sending transaction to create mint account...");
+            await provider.sendAndConfirm(tx, [mintKeypair]);
+            console.log("Mint account created successfully");
+          } catch (error) {
+            console.error("Error creating mint account:", error);
+            throw new Error("Failed to create mint account");
+          }
+        } else {
+          console.log("Mint account already exists, skipping creation");
+        }
+
+        // 使用已生成的minter和pauser密钥对
+        console.log("Using existing keypairs:");
+        console.log("Minter:", minterKeypair.publicKey.toString());
+        console.log("Pauser:", pauserKeypair.publicKey.toString());
+
+        // 为minter和pauser空投SOL
         try {
-          // 创建铸币账户指令
-          const createAccountIx = SystemProgram.createAccount({
-            fromPubkey: provider.wallet.publicKey,
-            newAccountPubkey: mintKeypair.publicKey,
-            space: mintSize,
-            lamports: rentExemptAmount,
-            programId: TOKEN_2022_PROGRAM_ID,
-          });
-
-          // 添加Token铸币初始化指令
-          const createMintIx = createInitializeMint2Instruction(
-            mintKeypair.publicKey,
-            6, // 6位小数
-            provider.wallet.publicKey, // 先使用钱包作为铸币权限，后续再转移给PDA
-            null,
-            TOKEN_2022_PROGRAM_ID
+          const airdropTx1 = await provider.connection.requestAirdrop(
+            minterKeypair.publicKey,
+            1 * LAMPORTS_PER_SOL
           );
-
-          // 创建交易并添加指令
-          const tx = new anchor.web3.Transaction()
-            .add(createAccountIx)
-            .add(createMintIx);
-
-          // 获取最新区块哈希
-          const { blockhash } = await provider.connection.getLatestBlockhash();
-          tx.recentBlockhash = blockhash;
-          tx.feePayer = provider.wallet.publicKey;
-
-          // 签名交易
-          tx.partialSign(mintKeypair);
-
-          console.log("Sending transaction to create mint account...");
-          await provider.sendAndConfirm(tx, [mintKeypair]);
-          console.log("Mint account created successfully");
+          await provider.connection.confirmTransaction(airdropTx1);
+          
+          const airdropTx2 = await provider.connection.requestAirdrop(
+            pauserKeypair.publicKey,
+            1 * LAMPORTS_PER_SOL
+          );
+          await provider.connection.confirmTransaction(airdropTx2);
         } catch (error) {
-          console.error("Error creating mint account:", error);
-          throw new Error("Failed to create mint account");
+          console.error("Error airdropping SOL to minter/pauser:", error);
+          throw new Error("Failed to airdrop SOL to minter/pauser");
         }
 
         // 初始化合约状态
         try {
-          // 初始化合约状态
-          console.log("Initializing contract state with program...");
 
-          // 检查账户是否已经存在
-          const mintAccountInfo = await provider.connection.getAccountInfo(
-            mintKeypair.publicKey
-          );
-          const mintStateInfo = await provider.connection.getAccountInfo(
-            mintStatePda
-          );
-          const authorityStateInfo = await provider.connection.getAccountInfo(
-            authorityPda
-          );
+          console.log("Debug: Account addresses being used:");
+          console.log("Authority:", provider.wallet.publicKey.toString());
+          console.log("Mint:", mintKeypair.publicKey.toString());
+          console.log("Authority PDA:", authorityPda.toString());
+          console.log("Mint State PDA:", mintStatePda.toString());
+          console.log("Pause State PDA:", pauseStatePda.toString());
+          console.log("Minter:", minterKeypair.publicKey.toString());
+          console.log("Pauser:", pauserKeypair.publicKey.toString());
 
-          // 如果账户已经存在并且是Token 2022账户，则不需要再次创建
-          // 但我们仍然需要确保authorityState和mintState已初始化
+          // 检查所有账户状态
+          console.log("Checking all account states...");
+          const accountStates = await Promise.all([
+            provider.connection.getAccountInfo(mintKeypair.publicKey),
+            provider.connection.getAccountInfo(mintStatePda),
+            provider.connection.getAccountInfo(authorityPda),
+            provider.connection.getAccountInfo(pauseStatePda)
+          ]);
+
+          const [checkMintAccount, checkMintState, checkAuthorityState, checkPauseState] = accountStates;
+
+          // 如果所有账户都已初始化，则跳过初始化步骤
           if (
-            mintAccountInfo &&
-            mintAccountInfo.owner.equals(TOKEN_2022_PROGRAM_ID) &&
-            mintStateInfo &&
-            authorityStateInfo
+            checkMintAccount &&
+            checkMintAccount.owner.equals(TOKEN_2022_PROGRAM_ID) &&
+            checkMintState &&
+            checkAuthorityState &&
+            checkPauseState
           ) {
-            console.log(
-              "All accounts already exist and initialized, skipping initialization"
-            );
-            return; // 所有账户都已初始化，可以跳过
+            console.log("All accounts already exist and initialized, skipping initialization");
+            return;
           }
 
-          try {
-            // 检查mint账户和authorityState账户是否已经初始化
-            const mintAccountInfo = await provider.connection.getAccountInfo(
-              mintKeypair.publicKey
-            );
-            const authorityStateInfo = await provider.connection.getAccountInfo(
-              authorityPda
-            );
-            const mintStateInfo = await provider.connection.getAccountInfo(
-              mintStatePda
-            );
-            const pauseStateInfo = await provider.connection.getAccountInfo(
-              pauseStatePda
-            );
-
-            // 如果所有账户都已初始化，则跳过初始化步骤
-            if (
-              mintAccountInfo &&
-              mintAccountInfo.owner.equals(TOKEN_2022_PROGRAM_ID) &&
-              authorityStateInfo &&
-              mintStateInfo &&
-              pauseStateInfo
-            ) {
-              console.log(
-                "All accounts already initialized, skipping initialize step"
-              );
-              return;
-            }
-
-            // 执行初始化流程，确保PDA账户被正确初始化
-            console.log("Performing initialization of PDA accounts...");
-
+          // 只有当mint账户不存在时才创建
+          if (!checkMintAccount) {
             try {
-              // 创建一个自定义的初始化交易，只初始化PDA账户
-              // 首先创建authority_state账户
-              const authorityStateSpace = 8 + 32 + 32 + 32 + 32 + 32; // 账户大小估计
-              const createAuthorityStateIx = SystemProgram.createAccount({
+              // 创建铸币账户指令
+              const createAccountIx = SystemProgram.createAccount({
                 fromPubkey: provider.wallet.publicKey,
-                newAccountPubkey: authorityPda,
-                space: authorityStateSpace,
-                lamports: await provider.connection.getMinimumBalanceForRentExemption(authorityStateSpace),
-                programId: program.programId,
+                newAccountPubkey: mintKeypair.publicKey,
+                space: mintSize,
+                lamports: rentExemptAmount,
+                programId: TOKEN_2022_PROGRAM_ID,
               });
 
-              // 创建mint_state账户
-              const mintStateSpace = 8 + 32 + 1; // 账户大小估计
-              const createMintStateIx = SystemProgram.createAccount({
-                fromPubkey: provider.wallet.publicKey,
-                newAccountPubkey: mintStatePda,
-                space: mintStateSpace,
-                lamports: await provider.connection.getMinimumBalanceForRentExemption(mintStateSpace),
-                programId: program.programId,
-              });
-
-              // 创建pause_state账户
-              const pauseStateSpace = 8 + 1; // 账户大小估计
-              const createPauseStateIx = SystemProgram.createAccount({
-                fromPubkey: provider.wallet.publicKey,
-                newAccountPubkey: pauseStatePda,
-                space: pauseStateSpace,
-                lamports: await provider.connection.getMinimumBalanceForRentExemption(pauseStateSpace),
-                programId: program.programId,
-              });
+              // 添加Token铸币初始化指令
+              const createMintIx = createInitializeMint2Instruction(
+                mintKeypair.publicKey,
+                6, // 6位小数
+                provider.wallet.publicKey, // 先使用钱包作为铸币权限，后续再转移给PDA
+                null,
+                TOKEN_2022_PROGRAM_ID
+              );
 
               // 创建交易并添加指令
               const tx = new anchor.web3.Transaction()
-                .add(createAuthorityStateIx)
-                .add(createMintStateIx)
-                .add(createPauseStateIx);
+                .add(createAccountIx)
+                .add(createMintIx);
 
               // 获取最新区块哈希
               const { blockhash } = await provider.connection.getLatestBlockhash();
               tx.recentBlockhash = blockhash;
               tx.feePayer = provider.wallet.publicKey;
 
-              console.log("Sending transaction to create PDA accounts...");
-              await provider.sendAndConfirm(tx);
-              console.log("PDA accounts created successfully");
+              // 签名交易
+              tx.partialSign(mintKeypair);
 
-              // 等待交易确认
-              await sleep(1000); // 等待一段时间确保账户更新
-
-              // 验证账户是否已初始化
-              const authorityStateInfo = await provider.connection.getAccountInfo(authorityPda);
-              if (authorityStateInfo) {
-                console.log("Authority state created successfully");
-              } else {
-                console.error("Authority state creation failed");
-              }
+              console.log("Sending transaction to create mint account...");
+              await provider.sendAndConfirm(tx, [mintKeypair]);
+              console.log("Mint account created successfully");
+              await sleep(1000); // 等待账户更新
             } catch (error) {
-              // 如果初始化失败，检查错误是否是因为账户已存在
-              console.error("Error in initialization:", error);
-
-              // 检查是否是因为账户已存在导致的错误
-              if (error.toString().includes("already in use")) {
-                console.log(
-                  "Some accounts already exist. Proceeding with tests anyway."
-                );
-                // 继续执行测试，不抛出错误
-              } else {
-                // 其他错误，抛出异常
-                throw error;
-              }
+              console.error("Error creating mint account:", error);
+              throw new Error("Failed to create mint account");
             }
+          } else {
+            console.log("Mint account already exists, skipping creation");
+          }
+
+          // 为minter和pauser空投SOL
+          try {
+            const airdropTx1 = await provider.connection.requestAirdrop(
+              minterKeypair.publicKey,
+              1 * LAMPORTS_PER_SOL
+            );
+            await provider.connection.confirmTransaction(airdropTx1);
+            console.log("Airdropped SOL to minter:", minterKeypair.publicKey.toString());
+            
+            const airdropTx2 = await provider.connection.requestAirdrop(
+              pauserKeypair.publicKey,
+              1 * LAMPORTS_PER_SOL
+            );
+            await provider.connection.confirmTransaction(airdropTx2);
+            console.log("Airdropped SOL to pauser:", pauserKeypair.publicKey.toString());
+          } catch (error) {
+            console.error("Error airdropping SOL to minter/pauser:", error);
+            throw new Error("Failed to airdrop SOL to minter/pauser");
+          }
+
+          // 检查PDA账户是否已存在
+          console.log("Checking PDA accounts status...");
+          const mintStateInfo = await provider.connection.getAccountInfo(mintStatePda);
+          const authorityStateInfo = await provider.connection.getAccountInfo(authorityPda);
+          const pauseStateInfo = await provider.connection.getAccountInfo(pauseStatePda);
+
+          console.log("PDA accounts status:");
+          console.log("- Mint State:", mintStateInfo ? "exists" : "not exists");
+          console.log("- Authority State:", authorityStateInfo ? "exists" : "not exists");
+          console.log("- Pause State:", pauseStateInfo ? "exists" : "not exists");
+
+          // 如果任何PDA账户不存在，则执行初始化
+          if (!mintStateInfo || !authorityStateInfo || !pauseStateInfo) {
+            console.log("Initializing PDA accounts...");
+            try {
+              const tx = await program.methods
+                .initialize(6) // 传入6位小数
+                .accounts({
+                  authority: provider.wallet.publicKey,
+                  minter: minterKeypair.publicKey,
+                  pauser: pauserKeypair.publicKey,
+                  authorityState: authorityPda,
+                  tokenMint: mintKeypair.publicKey,
+                  mintState: mintStatePda,
+                  pauseState: pauseStatePda,
+                  systemProgram: SystemProgram.programId,
+                  tokenProgram: TOKEN_2022_PROGRAM_ID,
+                })
+                .signers([mintKeypair]) // 添加mintKeypair作为签名者
+                .rpc();
+
+              console.log("PDA accounts initialization transaction:", tx);
+              await provider.connection.confirmTransaction(tx);
+              console.log("PDA accounts initialized successfully");
+              await sleep(1000); // 等待状态更新
+
+              // 验证PDA账户是否已正确初始化
+              const verifyMintState = await provider.connection.getAccountInfo(mintStatePda);
+              const verifyAuthorityState = await provider.connection.getAccountInfo(authorityPda);
+              const verifyPauseState = await provider.connection.getAccountInfo(pauseStatePda);
+
+              console.log("\nVerification after initialization:");
+              console.log("- Mint State:", verifyMintState ? "initialized" : "failed");
+              console.log("- Authority State:", verifyAuthorityState ? "initialized" : "failed");
+              console.log("- Pause State:", verifyPauseState ? "initialized" : "failed");
+
+              if (!verifyMintState || !verifyAuthorityState || !verifyPauseState) {
+                throw new Error("PDA accounts verification failed after initialization");
+              }
+            } catch (initError) {
+              console.error("\nError during PDA accounts initialization:", initError);
+              console.error("Error details:", JSON.stringify(initError, null, 2));
+              throw initError;
+            }
+          } else {
+            console.log("PDA accounts already initialized, skipping initialization");
+          }
+
+          // 检查账户是否已经存在
+          const existingMintAccount = await provider.connection.getAccountInfo(
+            mintKeypair.publicKey
+          );
+          const existingMintState = await provider.connection.getAccountInfo(
+            mintStatePda
+          );
+          const existingAuthorityState = await provider.connection.getAccountInfo(
+            authorityPda
+          );
+          const existingPauseState = await provider.connection.getAccountInfo(
+            pauseStatePda
+          );
+
+          // 如果所有账户都已初始化，则跳过初始化步骤
+          if (
+            existingMintAccount &&
+            existingMintAccount.owner.equals(TOKEN_2022_PROGRAM_ID) &&
+            existingMintState &&
+            existingAuthorityState &&
+            existingPauseState
+          ) {
+            console.log(
+              "All accounts already exist and initialized, skipping initialization"
+            );
+            return;
+          }
+
+          // 执行初始化流程
+          console.log("Initializing contract state...");
+          try {
+            await program.methods
+              .initialize(6) // 传入6位小数
+              .accounts({
+                authority: provider.wallet.publicKey,
+                minter: minterKeypair.publicKey,
+                pauser: pauserKeypair.publicKey,
+                authorityState: authorityPda,
+                tokenMint: mintKeypair.publicKey,
+                mintState: mintStatePda,
+                pauseState: pauseStatePda,
+                systemProgram: SystemProgram.programId,
+                tokenProgram: TOKEN_2022_PROGRAM_ID,
+              })
+              .signers([mintKeypair])
+              .rpc();
+
+            console.log("Contract state initialized successfully");
+            await sleep(1000); // 等待状态更新
           } catch (error) {
             console.error("Error in initialization:", error);
             throw error;
@@ -346,26 +468,30 @@ describe("WUSD Token Test", () => {
   it("Create Recipient Token Account", async () => {
     try {
       // 获取关联代币账户地址
-      // 使用已导入的getAssociatedTokenAddressSync函数
       recipientTokenAccount = getAssociatedTokenAddressSync(
         mintKeypair.publicKey,
         recipientKeypair.publicKey,
         false,
-        TOKEN_2022_PROGRAM_ID // 确保使用TOKEN_2022_PROGRAM_ID
+        TOKEN_2022_PROGRAM_ID
       );
 
+      // 创建关联代币账户指令
       const createTokenAccountIx = createAssociatedTokenAccountInstruction(
         provider.wallet.publicKey,
         recipientTokenAccount,
         recipientKeypair.publicKey,
         mintKeypair.publicKey,
-        TOKEN_2022_PROGRAM_ID // 确保使用TOKEN_2022_PROGRAM_ID
+        TOKEN_2022_PROGRAM_ID
       );
 
+      // 创建并发送交易
       const tx = new anchor.web3.Transaction().add(createTokenAccountIx);
+      tx.feePayer = provider.wallet.publicKey;
+      
+      const { blockhash } = await provider.connection.getLatestBlockhash();
+      tx.recentBlockhash = blockhash;
+      
       const signature = await provider.sendAndConfirm(tx);
-      await provider.connection.confirmTransaction(signature, "confirmed");
-      await sleep(1000);
       console.log(
         "Recipient token account created:",
         recipientTokenAccount.toString()
@@ -388,9 +514,8 @@ describe("WUSD Token Test", () => {
       console.log("Debug mint operation:");
       console.log("Current Authority:", provider.wallet.publicKey.toString());
 
-      // 创建一个新的Minter角色账户
-      const minterKeypair = anchor.web3.Keypair.generate();
-      console.log("New Minter:", minterKeypair.publicKey.toString());
+      // 使用已创建的Minter账户
+      console.log("Using existing Minter:", minterKeypair.publicKey.toString());
 
       // 转账SOL给minter账户以支付交易费用
       const transferToMinterTx = new anchor.web3.Transaction().add(
