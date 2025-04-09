@@ -2643,7 +2643,6 @@ version = "1.0.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
- "bincode",
  "serde",
  "solana-program",
  "spl-token-2022 0.9.0",

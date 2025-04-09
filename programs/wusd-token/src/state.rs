@@ -12,11 +12,6 @@ pub struct AllowanceState {
     pub amount: u64,
 }
 
-impl AllowanceState {
-    /// 授权额度状态账户大小
-    pub const SIZE: usize = 8 + 32 + 32 + 8; 
-}
-
 /// 签名许可状态账户，用于EIP-2612兼容的签名授权
 #[account]
 pub struct PermitState {
