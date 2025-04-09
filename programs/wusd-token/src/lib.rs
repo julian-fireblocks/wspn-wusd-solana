@@ -133,6 +133,11 @@ pub mod wusd_token {
         instructions::roles::set_role(ctx, role_type, new_role, is_add)
     }
     
+    /// 用户自行移除角色
+    pub fn remove_self_role(ctx: Context<RemoveSelfRole>, role_type: RoleType) -> Result<()> {
+        instructions::roles::remove_self_role(ctx, role_type)
+    }
+    
     /// 铸造WUSD代币 
     pub fn mint(ctx: Context<MintAccounts>, amount: u64, bump: u8) -> Result<()> {
         instructions::mint::mint(ctx, amount, bump) 

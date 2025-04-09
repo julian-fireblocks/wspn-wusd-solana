@@ -51,6 +51,25 @@ pub struct SetRole<'info> {
     pub token_mint: AccountInfo<'info>,
 }
 
+/// 用户自行移除角色的指令上下文
+#[derive(Accounts)]
+pub struct RemoveSelfRole<'info> {
+    /// 当前用户，必须签名
+    #[account(mut)]
+    pub user: Signer<'info>,
+
+    /// 权限管理状态账户
+    #[account(
+        mut,
+        seeds = [b"authority", token_mint.key().as_ref()],
+        bump
+    )]
+    pub authority_state: Account<'info, AuthorityState>,
+
+    /// CHECK: 代币铸币账户
+    pub token_mint: AccountInfo<'info>,
+}
+
 /// 转移管理员权限
 /// * `ctx` - 转移管理员权限的上下文
 /// * `new_admin` - 新管理员的公钥
@@ -127,6 +146,58 @@ pub fn set_role(
         RoleType::Freezer => emit!(FreezerRoleChangedEvent {
             freezer: new_role,
             is_add: is_add,
+        }),
+    }
+
+    Ok(())
+}
+
+/// 用户自行移除角色
+/// * `ctx` - 移除角色的上下文
+/// * `role_type` - 角色类型
+pub fn remove_self_role(
+    ctx: Context<RemoveSelfRole>,
+    role_type: RoleType,
+) -> Result<()> {
+    let user_key = ctx.accounts.user.key();
+    let authority_state = &mut ctx.accounts.authority_state;
+
+    match role_type {
+        RoleType::Minter => {
+            require!(authority_state.is_minter(user_key), WusdError::Unauthorized);
+            authority_state.remove_minter_role(user_key)?;
+        }
+        RoleType::Burner => {
+            require!(authority_state.is_burner(user_key), WusdError::Unauthorized);
+            authority_state.remove_burner_role(user_key)?;
+        }
+        RoleType::Pauser => {
+            require!(authority_state.is_pauser(user_key), WusdError::Unauthorized);
+            authority_state.remove_pauser_role(user_key)?;
+        }
+        RoleType::Freezer => {
+            require!(authority_state.is_freezer(user_key), WusdError::Unauthorized);
+            authority_state.remove_freezer_role(user_key)?;
+        }
+    };
+
+    // 发出相应的角色移除事件
+    match role_type {
+        RoleType::Minter => emit!(MinterRoleChangedEvent {
+            minter: user_key,
+            is_add: false,
+        }),
+        RoleType::Burner => emit!(BurnerRoleChangedEvent {
+            burner: user_key,
+            is_add: false,
+        }),
+        RoleType::Pauser => emit!(PauserRoleChangedEvent {
+            pauser: user_key,
+            is_add: false,
+        }),
+        RoleType::Freezer => emit!(FreezerRoleChangedEvent {
+            freezer: user_key,
+            is_add: false,
         }),
     }
 
