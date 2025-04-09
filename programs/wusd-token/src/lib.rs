@@ -17,7 +17,7 @@ use instructions::permit::*;
 use instructions::pause::*;
 use instructions::freeze::*;
 
-declare_id!("8nBbkdsTkqbrnrbVTUxyciQNvT6Q5B3pZkPQmP3nnuwU");
+declare_id!("4xPf5n8CbNUm8AT5DVgdWaPT3nVTPKU9oGjreiGBK3fB");
 
 // 辅助函数：初始化状态账户，减少栈使用
 #[inline(always)]

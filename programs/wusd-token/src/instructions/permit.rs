@@ -61,7 +61,7 @@ pub fn permit(ctx: Context<Permit>, params: PermitParams) -> Result<()> {
         ctx.accounts.spender.key(),
         params.amount,
         params.deadline,
-        *ctx.bumps.get("permit_state").unwrap()
+        ctx.bumps.permit_state
     ));
     
     // 设置授权额度
