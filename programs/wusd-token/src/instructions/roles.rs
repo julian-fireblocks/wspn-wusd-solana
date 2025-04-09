@@ -1,6 +1,6 @@
-use crate::error::WusdError;
-use crate::state::AuthorityState;
+use crate::error::WusdError;  
 use anchor_lang::prelude::*;
+use crate::state::{AuthorityState,PauseState};
 
 /// 角色类型枚举
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq)]
@@ -49,6 +49,13 @@ pub struct SetRole<'info> {
 
     /// CHECK: 代币铸币账户
     pub token_mint: AccountInfo<'info>,
+    
+    #[account(
+        seeds = [b"pause_state", token_mint.key().as_ref()],
+        bump,
+        constraint = !pause_state.paused @ WusdError::ContractPaused
+    )]
+    pub pause_state: Account<'info, PauseState>,
 }
 
 /// 用户自行移除角色的指令上下文
@@ -68,6 +75,13 @@ pub struct RemoveSelfRole<'info> {
 
     /// CHECK: 代币铸币账户
     pub token_mint: AccountInfo<'info>,
+    
+    #[account(
+        seeds = [b"pause_state", token_mint.key().as_ref()],
+        bump,
+        constraint = !pause_state.paused @ WusdError::ContractPaused
+    )]
+    pub pause_state: Account<'info, PauseState>,
 }
 
 /// 转移管理员权限

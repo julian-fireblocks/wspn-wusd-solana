@@ -6,7 +6,7 @@ use anchor_spl::token_2022::{self, mint_to};
 
 pub fn mint(ctx: Context<MintAccounts>, amount: u64, bump: u8) -> Result<()> {
     // 验证金额有效性
-    require!(amount > 0, WusdError::InvalidAmount); 
+    require!(amount > 0, WusdError::InvalidAmount);
 
     // 执行铸币 - 极简化CPI调用
     let mint_key = ctx.accounts.token_mint.key();
@@ -43,7 +43,10 @@ pub struct MintAccounts<'info> {
     pub authority: Signer<'info>,
     #[account(mut)]
     pub token_mint: InterfaceAccount<'info, anchor_spl::token_interface::Mint>,
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = !token_account.is_frozen() @ WusdError::AccountFrozen
+    )]
     pub token_account: InterfaceAccount<'info, anchor_spl::token_interface::TokenAccount>,
     pub token_program: Program<'info, Token2022>,
     #[account(

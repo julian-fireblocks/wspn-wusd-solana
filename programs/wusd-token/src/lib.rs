@@ -144,8 +144,8 @@ pub mod wusd_token {
     }
     
     /// 处理代表津贴请求，允许代币持有者授权其他账户使用其代币 
-    pub fn delegate(ctx: Context<Delegate>, amount: u64, expiry_time: i64) -> Result<()> { 
-        instructions::permit::delegate(ctx, amount, expiry_time) 
+    pub fn approve(ctx: Context<Approve>, amount: u64, expiry_time: i64) -> Result<()> { 
+        instructions::permit::approve_set(ctx, amount, expiry_time) 
     }
 
     /// 转账WUSD代币 

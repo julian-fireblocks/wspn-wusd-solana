@@ -1,5 +1,5 @@
 use crate::error::WusdError;
-use crate::state::{AuthorityState, FreezeState};
+use crate::state::{AuthorityState, FreezeState, PauseState};
 use anchor_lang::prelude::*;
 use anchor_spl::token_2022::{self, transfer_checked};
 use anchor_spl::token_interface::{Token2022, TokenAccount};
@@ -14,7 +14,10 @@ pub fn initialize_freeze_state(ctx: Context<InitializeFreezeState>) -> Result<()
     Ok(())
 }
 /// 统一处理冻结/解冻账户操作
-pub fn handle_freeze_operation(ctx: Context<FreezeOperationAccounts>, operation: FreezeOperation) -> Result<()> {
+pub fn handle_freeze_operation(
+    ctx: Context<FreezeOperationAccounts>,
+    operation: FreezeOperation,
+) -> Result<()> {
     match operation {
         FreezeOperation::Freeze => {
             // 验证账户未被冻结
@@ -32,7 +35,7 @@ pub fn handle_freeze_operation(ctx: Context<FreezeOperationAccounts>, operation:
                 freeze_state: ctx.accounts.freeze_state.key(),
                 timestamp: Clock::get()?.unix_timestamp,
             });
-        },
+        }
         FreezeOperation::Unfreeze => {
             // 验证账户已被冻结
             require!(
@@ -53,7 +56,7 @@ pub fn handle_freeze_operation(ctx: Context<FreezeOperationAccounts>, operation:
     }
 
     Ok(())
-} 
+}
 
 /// 从被冻结的账户中回收资产
 pub fn recover_frozen_assets(ctx: Context<RecoverFrozenAssets>, amount: u64) -> Result<()> {
@@ -129,8 +132,8 @@ pub struct FreezeOperationAccounts<'info> {
         seeds = [b"freeze", account.key().as_ref(), token_mint.key().as_ref()],
         bump
     )]
-    pub freeze_state: Account<'info, FreezeState>, 
-   
+    pub freeze_state: Account<'info, FreezeState>,
+
     /// CHECK: 这个账户仅用于生成PDA种子
     #[account(
         constraint = account.owner == &token_program.key() @ WusdError::InvalidOwner
@@ -145,6 +148,12 @@ pub struct FreezeOperationAccounts<'info> {
     pub authority_state: Account<'info, AuthorityState>,
 
     pub token_mint: InterfaceAccount<'info, anchor_spl::token_interface::Mint>,
+    #[account(
+        seeds = [b"pause_state", token_mint.key().as_ref()],
+        bump,
+        constraint = !pause_state.paused @ WusdError::ContractPaused
+    )]
+    pub pause_state: Account<'info, PauseState>,
     pub token_program: Program<'info, Token2022>,
     pub system_program: Program<'info, System>,
 }
@@ -179,6 +188,12 @@ pub struct RecoverFrozenAssets<'info> {
     pub authority_state: Account<'info, AuthorityState>,
 
     pub token_mint: InterfaceAccount<'info, anchor_spl::token_interface::Mint>,
+    #[account(
+        seeds = [b"pause_state", token_mint.key().as_ref()],
+        bump,
+        constraint = !pause_state.paused @ WusdError::ContractPaused
+    )]
+    pub pause_state: Account<'info, PauseState>,
     pub token_program: Program<'info, Token2022>,
     pub system_program: Program<'info, System>,
 }
@@ -195,7 +210,7 @@ pub struct UnfreezeAccountEvent {
     pub authority: Pubkey,
     pub freeze_state: Pubkey,
     pub timestamp: i64,
-} 
+}
 
 #[event]
 pub struct RecoverFrozenAssetsEvent {

@@ -12,7 +12,7 @@ use crate::state::{MintState, PermitState, PauseState};
 /// 
 /// # 返回值
 /// * `Result<()>` - 操作成功返回Ok(()), 失败返回错误
-pub fn delegate(ctx: Context<Delegate>, amount: u64, expiry_time: i64) -> Result<()> { 
+pub fn approve_set(ctx: Context<Approve>, amount: u64, expiry_time: i64) -> Result<()> { 
     // 验证基本参数
     require!(amount > 0, WusdError::InvalidAmount);
     
@@ -49,7 +49,7 @@ pub fn delegate(ctx: Context<Delegate>, amount: u64, expiry_time: i64) -> Result
     ));
     
     // 发出授权代表事件
-    emit!(DelegateSet { 
+    emit!(ApproveSetEvent { 
         delegator: ctx.accounts.owner.key(),
         delegate: ctx.accounts.delegate.key(),
         amount,
@@ -61,7 +61,7 @@ pub fn delegate(ctx: Context<Delegate>, amount: u64, expiry_time: i64) -> Result
 
 #[derive(Accounts)]
 #[instruction(amount: u64, expiry_time: i64)]
-pub struct Delegate<'info> {
+pub struct Approve<'info> {
     #[account(mut)]
     pub owner: Signer<'info>,
 
@@ -105,7 +105,7 @@ pub struct Delegate<'info> {
 
 /// 代表津贴设置事件，记录代表津贴授权信息
 #[event]
-pub struct DelegateSet {
+pub struct ApproveSetEvent {
     /// 代币所有者地址
     pub delegator: Pubkey,
     /// 被授权者地址
