@@ -1,5 +1,5 @@
 use crate::error::WusdError;
-use crate::state::{AuthorityState, MintState, PauseState};
+use crate::state::{AuthorityState, FreezeState, MintState, PauseState};
 use anchor_lang::prelude::*;
 use anchor_spl::token_2022::Token2022;
 use anchor_spl::token_2022::{self, mint_to};
@@ -45,8 +45,12 @@ pub struct MintAccounts<'info> {
     pub token_mint: InterfaceAccount<'info, anchor_spl::token_interface::Mint>,
     #[account(
         mut,
-        constraint = !token_account.is_frozen() @ WusdError::AccountFrozen
+        constraint = !freeze_state.is_frozen  @ WusdError::AccountFrozen,
+        seeds = [b"freeze", token_account.key().as_ref(), token_mint.key().as_ref()],
+        bump
     )]
+    pub freeze_state: Box<Account<'info, FreezeState>>,
+    #[account(mut)]
     pub token_account: InterfaceAccount<'info, anchor_spl::token_interface::TokenAccount>,
     pub token_program: Program<'info, Token2022>,
     #[account(
@@ -65,7 +69,7 @@ pub struct MintAccounts<'info> {
         bump,
         constraint = !pause_state.paused @ WusdError::ContractPaused
     )]
-    pub pause_state: Account<'info, PauseState>,
+    pub pause_state: Box<Account<'info, PauseState>>,
     pub system_program: Program<'info, System>,
 }
 
