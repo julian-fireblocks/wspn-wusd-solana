@@ -59,28 +59,28 @@ impl PermitState {
 pub struct AuthorityState {
     /// 管理员地址
     pub admin: Pubkey,
-    /// 铸币角色地址
-    pub minter_role: Pubkey,
-    /// 销毁角色地址
-    pub burner_role: Pubkey,
-    /// 暂停角色地址
-    pub pauser_role: Pubkey,
-    /// 冻结角色地址
-    pub freezer_role: Pubkey,
+    /// 铸币角色地址列表
+    pub minter_roles: Vec<Pubkey>,
+    /// 销毁角色地址列表
+    pub burner_roles: Vec<Pubkey>,
+    /// 暂停角色地址列表
+    pub pauser_roles: Vec<Pubkey>,
+    /// 冻结角色地址列表
+    pub freezer_roles: Vec<Pubkey>,
 }
 
 impl AuthorityState {
     /// 权限管理状态账户大小
     /// discriminator + admin + minter_role + burner_role + pauser_role
-    pub const SIZE: usize = 8 + 32 + 32 + 32 + 32 + 32;
+    pub const SIZE: usize = 8 + 32 + 4 + 4 + 4 + 4; // 32 for admin, 4 for each Vec length
 
     pub fn initialize(admin: Pubkey) -> Self {
         Self {
             admin,
-            minter_role: Pubkey::default(),
-            burner_role: Pubkey::default(),
-            pauser_role: Pubkey::default(),
-            freezer_role: Pubkey::default(),
+            minter_roles: Vec::new(),
+            burner_roles: Vec::new(),
+            pauser_roles: Vec::new(),
+            freezer_roles: Vec::new(),
         }
     }
 
@@ -95,52 +95,84 @@ impl AuthorityState {
         Ok(())
     }
 
-    /// 设置铸币角色
-    pub fn set_minter_role(&mut self, minter: Pubkey) -> Result<()> {
+    /// 添加铸币角色
+    pub fn add_minter_role(&mut self, minter: Pubkey) -> Result<()> {
         require!(minter != Pubkey::default(), WusdError::InvalidAddress);
-        self.minter_role = minter;
+        if !self.minter_roles.contains(&minter) {
+            self.minter_roles.push(minter);
+        }
         Ok(())
     }
 
-    /// 设置销毁角色
-    pub fn set_burner_role(&mut self, burner: Pubkey) -> Result<()> {
+    /// 移除铸币角色
+    pub fn remove_minter_role(&mut self, minter: Pubkey) -> Result<()> {
+        self.minter_roles.retain(|&x| x != minter);
+        Ok(())
+    }
+
+    /// 添加销毁角色
+    pub fn add_burner_role(&mut self, burner: Pubkey) -> Result<()> {
         require!(burner != Pubkey::default(), WusdError::InvalidAddress);
-        self.burner_role = burner;
+        if !self.burner_roles.contains(&burner) {
+            self.burner_roles.push(burner);
+        }
         Ok(())
     }
 
-    /// 设置冻结角色
-    pub fn set_freezer_role(&mut self, freezer: Pubkey) -> Result<()> {
+    /// 移除销毁角色
+    pub fn remove_burner_role(&mut self, burner: Pubkey) -> Result<()> {
+        self.burner_roles.retain(|&x| x != burner);
+        Ok(())
+    }
+
+    /// 添加冻结角色
+    pub fn add_freezer_role(&mut self, freezer: Pubkey) -> Result<()> {
         require!(freezer != Pubkey::default(), WusdError::InvalidAddress);
-        self.freezer_role = freezer;
+        if !self.freezer_roles.contains(&freezer) {
+            self.freezer_roles.push(freezer);
+        }
         Ok(())
     }
 
-    /// 设置暂停角色
-    pub fn set_pauser_role(&mut self, pauser: Pubkey) -> Result<()> {
+    /// 移除冻结角色
+    pub fn remove_freezer_role(&mut self, freezer: Pubkey) -> Result<()> {
+        self.freezer_roles.retain(|&x| x != freezer);
+        Ok(())
+    }
+
+    /// 添加暂停角色
+    pub fn add_pauser_role(&mut self, pauser: Pubkey) -> Result<()> {
         require!(pauser != Pubkey::default(), WusdError::InvalidAddress);
-        self.pauser_role = pauser;
+        if !self.pauser_roles.contains(&pauser) {
+            self.pauser_roles.push(pauser);
+        }
+        Ok(())
+    }
+
+    /// 移除暂停角色
+    pub fn remove_pauser_role(&mut self, pauser: Pubkey) -> Result<()> {
+        self.pauser_roles.retain(|&x| x != pauser);
         Ok(())
     }
 
     /// 验证铸币角色
     pub fn is_minter(&self, user: Pubkey) -> bool {
-        self.minter_role == user
+        self.minter_roles.contains(&user)
     }
 
     /// 验证销毁角色
     pub fn is_burner(&self, user: Pubkey) -> bool {
-        self.burner_role == user
+        self.burner_roles.contains(&user)
     }
 
     /// 验证暂停角色
     pub fn is_pauser(&self, user: Pubkey) -> bool {
-        self.pauser_role == user
+        self.pauser_roles.contains(&user)
     }
 
     /// 验证是否为冻结角色
     pub fn is_freezer(&self, user: Pubkey) -> bool {
-        self.freezer_role == user
+        self.freezer_roles.contains(&user)
     }
 }
 

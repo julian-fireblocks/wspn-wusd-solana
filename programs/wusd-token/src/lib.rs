@@ -22,21 +22,24 @@ declare_id!("4xPf5n8CbNUm8AT5DVgdWaPT3nVTPKU9oGjreiGBK3fB");
 // 辅助函数：初始化状态账户，减少栈使用
 #[inline(always)]
 fn initialize_state_accounts(
-    auth_key: Pubkey,
+    admin_key: Pubkey,
+    minter_key: Pubkey,
+    pauser_key: Pubkey,
     authority_state: &mut Account<AuthorityState>,
     mint_state: &mut Account<MintState>,
     pause_state: &mut Account<PauseState>,
     token_mint_key: Pubkey,
     decimals: u8,
-) {
-    authority_state.admin = auth_key;
-    authority_state.minter_role = auth_key;
-    authority_state.burner_role = auth_key;
+) -> Result<()> {
+    authority_state.admin = admin_key; 
+    authority_state.add_minter_role(minter_key)?;
+    authority_state.add_pauser_role(pauser_key)?;
 
     mint_state.mint = token_mint_key;
     mint_state.decimals = decimals;
 
     pause_state.paused = false;
+    Ok(())
 }
 
 // 辅助函数：转移权限，极度简化以减少栈使用
@@ -87,12 +90,14 @@ pub mod wusd_token {
         // 1. 初始化状态账户 - 使用辅助函数减少栈使用
         initialize_state_accounts(
             ctx.accounts.authority.key(),
+            ctx.accounts.minter.key(),
+            ctx.accounts.pauser.key(),
             &mut ctx.accounts.authority_state,
             &mut ctx.accounts.mint_state,
             &mut ctx.accounts.pause_state,
             ctx.accounts.token_mint.key(),
             decimals
-        );
+        )?;
 
         // 2. 转移mint和freeze权限 - 使用辅助函数减少栈使用
         transfer_authorities(
@@ -123,9 +128,9 @@ pub mod wusd_token {
         instructions::roles::transfer_admin(ctx, new_admin)
     }  
     
-    /// 设置角色
-    pub fn set_role(ctx: Context<SetRole>, role_type: RoleType, new_role: Pubkey) -> Result<()> {
-        instructions::roles::set_role(ctx, role_type, new_role)
+    /// 设置角色 (支持添加/移除)
+    pub fn set_role(ctx: Context<SetRole>, role_type: RoleType, new_role: Pubkey, is_add: bool) -> Result<()> {
+        instructions::roles::set_role(ctx, role_type, new_role, is_add)
     }
     
     /// 铸造WUSD代币 
@@ -184,6 +189,14 @@ pub struct Initialize<'info> {
     /// 管理员账户
     #[account(mut)]
     pub authority: Signer<'info>,
+
+    /// 铸币者账户
+    /// CHECK: 此账户仅用于验证签名，不直接读取或写入数据
+    pub minter: AccountInfo<'info>,
+
+    /// 暂停者账户
+    /// CHECK: 此账户仅用于验证签名，不直接读取或写入数据
+    pub pauser: AccountInfo<'info>,
 
     /// 权限管理账户 - 极简化约束条件
     #[account(
