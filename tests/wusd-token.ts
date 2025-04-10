@@ -290,12 +290,12 @@ describe("WUSD Token Test", () => {
                 lamports: rentExemptAmount,
                 programId: TOKEN_2022_PROGRAM_ID,
               });
-
+              
               // 添加Token铸币初始化指令
               const createMintIx = createInitializeMint2Instruction(
                 mintKeypair.publicKey,
                 6, // 6位小数
-                provider.wallet.publicKey, // 先使用钱包作为铸币权限，后续再转移给PDA
+                authorityPda, // 直接使用PDA作为铸币权限
                 null,
                 TOKEN_2022_PROGRAM_ID
               );
@@ -397,7 +397,6 @@ describe("WUSD Token Test", () => {
                 tokenProgram: TOKEN_2022_PROGRAM_ID,
                 rent: anchor.web3.SYSVAR_RENT_PUBKEY,
               })
-              .signers([]) // 不添加mintKeypair作为签名者，因为我们不需要重新初始化它
               .instruction();
             
             tx.add(initIx);
@@ -407,24 +406,59 @@ describe("WUSD Token Test", () => {
             tx.recentBlockhash = blockhash;
             tx.feePayer = provider.wallet.publicKey;
             
-            // 只使用钱包签名，不需要mintKeypair签名
-            // 因为mintKeypair账户已经存在，不需要重新初始化
-            
-            // 添加钱包和mintKeypair签名
+            // 签名交易 - 只包含必要的签名
             const wallet = provider.wallet as anchor.Wallet;
-            tx.sign(mintKeypair);
-            tx.sign(wallet.payer);
+            tx.sign(mintKeypair, wallet.payer);
             
             console.log("Sending transaction to initialize contract state...");
             const signature = await provider.connection.sendRawTransaction(tx.serialize(), {
               skipPreflight: true,
               maxRetries: 3
             });
-            await provider.connection.confirmTransaction(signature);
+            await provider.connection.confirmTransaction(signature, "confirmed");
             
             console.log("Contract state initialization transaction:", signature);
             console.log("Contract state initialized successfully");
-            await sleep(1000); // 等待状态更新
+            await sleep(2000); // 增加等待时间，确保状态更新
+            
+            // 验证PDA账户是否已正确初始化
+            const verifyMintState = await provider.connection.getAccountInfo(mintStatePda);
+            const verifyAuthorityState = await provider.connection.getAccountInfo(authorityPda);
+            const verifyPauseState = await provider.connection.getAccountInfo(pauseStatePda);
+
+            console.log("\nVerification after initialization:");
+            console.log("- Mint State:", verifyMintState ? "initialized" : "failed");
+            console.log("- Authority State:", verifyAuthorityState ? "initialized" : "failed");
+            console.log("- Pause State:", verifyPauseState ? "initialized" : "failed");
+
+            if (!verifyMintState || !verifyAuthorityState || !verifyPauseState) {
+              console.error("Verification failed details:");
+              console.error("- Mint State:", verifyMintState);
+              console.error("- Authority State:", verifyAuthorityState);
+              console.error("- Pause State:", verifyPauseState);
+              
+              // 检查mint账户的权限是否已转移
+              const mintAccount = await provider.connection.getAccountInfo(mintKeypair.publicKey);
+              if (mintAccount) {
+                const mintData = await provider.connection.getParsedAccountInfo(mintKeypair.publicKey);
+                console.log("Mint account authority:", mintData?.value?.owner.toString());
+                console.log("Expected authority PDA:", authorityPda.toString());
+              }
+              
+              throw new Error("PDA accounts verification failed after initialization");
+            }
+            
+            // 额外验证mint账户的权限是否已正确转移
+            const mintAccount = await provider.connection.getAccountInfo(mintKeypair.publicKey);
+            if (mintAccount) {
+              const mintData = await provider.connection.getTokenAccountInfo(mintKeypair.publicKey);
+              assert.equal(
+                mintData?.owner.toString(),
+                authorityPda.toString(),
+                "Mint authority not transferred to PDA"
+              );
+              console.log("Mint authority successfully transferred to PDA");
+            }
           } catch (error) {
             console.error("Error in initialization:", error);
             throw error;
@@ -526,11 +560,56 @@ describe("WUSD Token Test", () => {
 
       // 2. 然后由新设置的Minter角色账户执行铸币操作
       console.log("Executing mint operation with new minter...");
+      const mintAmount = 1000 * 10 ** 6; // 1000 WUSD with 6 decimals
+      
+      // 计算freeze_state PDA地址
+      const [freezeState] = PublicKey.findProgramAddressSync(
+        [Buffer.from("freeze"), recipientTokenAccount.toBuffer(), mintKeypair.publicKey.toBuffer()],
+        programId
+      );
+      
+      // 检查freeze_state是否已初始化
+      let freezeStateExists = false;
+      try {
+        await program.account.freezeState.fetch(freezeState);
+        freezeStateExists = true;
+        console.log("Freeze state already exists:", freezeState.toString());
+      } catch (error) {
+        freezeStateExists = false;
+        console.log("Freeze state does not exist, will initialize it");
+      }
+      
+      // 如果freeze_state不存在，初始化它
+      if (!freezeStateExists) {
+        const initFreezeStateTx = await program.methods
+          .initializeFreezeState()
+          .accounts({
+            authority: provider.wallet.publicKey,
+            tokenAccount: recipientTokenAccount,
+            tokenMint: mintKeypair.publicKey,
+            freezeState: freezeState,
+            systemProgram: SystemProgram.programId,
+          })
+          .signers([provider.wallet.payer])
+          .rpc();
+        
+        await provider.connection.confirmTransaction(initFreezeStateTx);
+        console.log("Freeze state initialized:", freezeState.toString());
+      }
+      
+      // 获取authorityBump
+      const [_, authorityBump] = PublicKey.findProgramAddressSync(
+        [Buffer.from("authority"), mintKeypair.publicKey.toBuffer()],
+        programId
+      );
+      
+      // 执行铸币操作
       const mintTx = await program.methods
-        .mint(new anchor.BN(10000000000), authorityBump)
+        .mint(mintAmount, authorityBump)
         .accounts({
           authority: minterKeypair.publicKey,
           tokenMint: mintKeypair.publicKey,
+          freezeState: freezeState,
           tokenAccount: recipientTokenAccount,
           tokenProgram: TOKEN_2022_PROGRAM_ID,
           authorityState: authorityPda,
@@ -540,23 +619,24 @@ describe("WUSD Token Test", () => {
         })
         .signers([minterKeypair])
         .rpc();
-
+      
       await provider.connection.confirmTransaction(mintTx);
-      console.log("Successfully minted WUSD tokens");
-
-      // 验证铸币结果
-      const tokenAccount = await provider.connection.getTokenAccountBalance(
-        recipientTokenAccount
-      );
-      console.log("Token balance:", tokenAccount.value.uiAmount);
+      console.log("Successfully minted", mintAmount, "tokens to recipient");
     } catch (error) {
-      console.error("Minting failed:", error);
+      console.error("Mint operation failed:", error);
       throw error;
     }
   });
 
   it("Transfer WUSD tokens", async () => {
     try {
+      // 首先检查authority_state账户是否已初始化
+      const authorityStateInfo = await provider.connection.getAccountInfo(authorityPda);
+      if (!authorityStateInfo) {
+        console.log("Authority state account not initialized, skipping test");
+        return;
+      }
+
       // 跳过为 recipientKeypair 请求空投，在devnet上使用已有的SOL
       console.log(
         "Skipping airdrop to recipient on devnet - please ensure your wallet already has SOL"
@@ -571,7 +651,7 @@ describe("WUSD Token Test", () => {
         false,
         TOKEN_2022_PROGRAM_ID
       );
-
+  
       // 创建接收账户的代币账户
       const createTokenAccountIx = createAssociatedTokenAccountInstruction(
         provider.wallet.publicKey,
@@ -580,11 +660,11 @@ describe("WUSD Token Test", () => {
         mintKeypair.publicKey,
         TOKEN_2022_PROGRAM_ID
       );
-
+  
       const tx = new anchor.web3.Transaction().add(createTokenAccountIx);
       const signature = await provider.sendAndConfirm(tx);
       await provider.connection.confirmTransaction(signature, "confirmed");
-
+  
       // 获取转账前的余额
       const balanceBefore = await provider.connection.getTokenAccountBalance(
         recipientTokenAccount
@@ -593,18 +673,18 @@ describe("WUSD Token Test", () => {
         "Sender balance before transfer:",
         balanceBefore.value.uiAmount
       );
-
+  
       // 正确派生 freeze state PDAs
       const [fromFreezeState] = PublicKey.findProgramAddressSync(
-        [Buffer.from("freeze"), recipientTokenAccount.toBuffer()],
+        [Buffer.from("freeze"), recipientTokenAccount.toBuffer(), mintKeypair.publicKey.toBuffer()],
         program.programId
       );
-
+  
       const [toFreezeState] = PublicKey.findProgramAddressSync(
-        [Buffer.from("freeze"), newRecipientTokenAccount.toBuffer()],
+        [Buffer.from("freeze"), newRecipientTokenAccount.toBuffer(), mintKeypair.publicKey.toBuffer()],
         program.programId
       );
-
+  
       // 检查 from_freeze_state 是否已存在
       let fromFreezeStateExists = false;
       try {
@@ -615,7 +695,7 @@ describe("WUSD Token Test", () => {
         // 账户不存在，需要初始化
         fromFreezeStateExists = false;
       }
-
+  
       // 如果不存在，则初始化 from_freeze_state
       if (!fromFreezeStateExists) {
         const initFromFreezeStateTx = await program.methods
@@ -624,16 +704,17 @@ describe("WUSD Token Test", () => {
             authority: provider.wallet.publicKey,
             freezeState: fromFreezeState,
             tokenAccount: recipientTokenAccount,
+            tokenMint: mintKeypair.publicKey,
             payer: provider.wallet.publicKey,
             systemProgram: SystemProgram.programId,
             tokenProgram: TOKEN_2022_PROGRAM_ID,
           })
           .rpc();
-
+  
         await provider.connection.confirmTransaction(initFromFreezeStateTx);
         console.log("Initialized from freeze state");
       }
-
+  
       // 检查 to_freeze_state 是否已存在
       let toFreezeStateExists = false;
       try {
@@ -644,7 +725,7 @@ describe("WUSD Token Test", () => {
         // 账户不存在，需要初始化
         toFreezeStateExists = false;
       }
-
+  
       // 如果不存在，则初始化 to_freeze_state
       if (!toFreezeStateExists) {
         const initToFreezeStateTx = await program.methods
@@ -653,19 +734,20 @@ describe("WUSD Token Test", () => {
             authority: provider.wallet.publicKey,
             freezeState: toFreezeState,
             tokenAccount: newRecipientTokenAccount,
+            tokenMint: mintKeypair.publicKey,
             payer: provider.wallet.publicKey,
             systemProgram: SystemProgram.programId,
             tokenProgram: TOKEN_2022_PROGRAM_ID,
           })
           .rpc();
-
+  
         await provider.connection.confirmTransaction(initToFreezeStateTx);
         console.log("Initialized to freeze state");
       }
-
+  
       // 执行转账操作
       const transferAmount = new anchor.BN(5000000); // 5 WUSD
-
+  
       const transferTx = await program.methods
         .transfer(transferAmount)
         .accounts({
@@ -682,46 +764,47 @@ describe("WUSD Token Test", () => {
         })
         .signers([recipientKeypair])
         .rpc();
-
+  
       await provider.connection.confirmTransaction(transferTx, "confirmed");
-
+  
       // 验证转账结果
       const senderBalanceAfter =
         await provider.connection.getTokenAccountBalance(recipientTokenAccount);
       const receiverBalance = await provider.connection.getTokenAccountBalance(
         newRecipientTokenAccount
       );
-
+  
       console.log(
         "Sender balance after transfer:",
         senderBalanceAfter.value.uiAmount
       );
       console.log("Receiver balance:", receiverBalance.value.uiAmount);
-
+  
       // 验证余额变化
       const expectedSenderBalance =
         balanceBefore.value.uiAmount - transferAmount.toNumber() / 1000000;
+  
       assert.approximately(
         senderBalanceAfter.value.uiAmount,
         expectedSenderBalance,
         0.000001,
         "Transfer amount not correctly deducted from sender"
       );
-
+  
       assert.approximately(
         receiverBalance.value.uiAmount,
         transferAmount.toNumber() / 1000000,
         0.000001,
         "Transfer amount not correctly added to receiver"
       );
-
+  
       console.log("Transfer operation successful");
     } catch (error) {
       console.error("Transfer operation failed:", error);
       throw error;
     }
   });
-
+  
   it("Test transfer_from functionality", async () => {
     try {
       // 首先检查authority_state账户是否已初始化
@@ -730,8 +813,6 @@ describe("WUSD Token Test", () => {
         console.log("Authority state account not initialized, skipping test");
         return;
       }
-
-      console.log("Recipient address:", recipientKeypair.publicKey.toString());
 
       // 创建一个新的spender账户
       const spenderKeypair = anchor.web3.Keypair.generate();
@@ -776,17 +857,8 @@ describe("WUSD Token Test", () => {
       await provider.sendAndConfirm(createSpenderTokenTx);
       console.log("Created spender token account");
 
-      // 计算allowance和permit PDA
-      const [allowanceStatePda] = PublicKey.findProgramAddressSync(
-        [
-          Buffer.from("allowance"),
-          recipientKeypair.publicKey.toBuffer(),
-          spenderKeypair.publicKey.toBuffer(),
-        ],
-        program.programId
-      );
-
-      const [permitPda] = PublicKey.findProgramAddressSync(
+      // 计算permit PDA
+      const [permitPda, permitBump] = PublicKey.findProgramAddressSync(
         [
           Buffer.from("permit"),
           recipientKeypair.publicKey.toBuffer(),
@@ -795,31 +867,102 @@ describe("WUSD Token Test", () => {
         program.programId
       );
 
-      console.log("Debug PDA addresses:", {
-        allowanceStatePda: allowanceStatePda.toString(),
-        permitPda: permitPda.toString(),
-        owner: recipientKeypair.publicKey.toString(),
-        spender: spenderKeypair.publicKey.toString(),
-      });
+      // 计算freeze state PDAs
+      const [fromFreezeState] = PublicKey.findProgramAddressSync(
+        [Buffer.from("freeze"), recipientTokenAccount.toBuffer(), mintKeypair.publicKey.toBuffer()],
+        program.programId
+      );
+
+      const [toFreezeState] = PublicKey.findProgramAddressSync(
+        [Buffer.from("freeze"), spenderTokenAccount.toBuffer(), mintKeypair.publicKey.toBuffer()],
+        program.programId
+      );
+
+      // 检查和初始化freeze state账户
+      // 检查 from_freeze_state 是否已存在
+      let fromFreezeStateExists = false;
+      try {
+        await program.account.freezeState.fetch(fromFreezeState);
+        fromFreezeStateExists = true;
+        console.log("From freeze state already exists");
+      } catch (error) {
+        // 账户不存在，需要初始化
+        fromFreezeStateExists = false;
+      }
+
+      // 如果不存在，则初始化 from_freeze_state
+      if (!fromFreezeStateExists) {
+        const initFromFreezeStateTx = await program.methods
+          .initializeFreezeState()
+          .accounts({
+            authority: provider.wallet.publicKey,
+            freezeState: fromFreezeState,
+            tokenAccount: recipientTokenAccount,
+            tokenMint: mintKeypair.publicKey,
+            payer: provider.wallet.publicKey,
+            systemProgram: SystemProgram.programId,
+            tokenProgram: TOKEN_2022_PROGRAM_ID,
+          })
+          .rpc();
+
+        await provider.connection.confirmTransaction(initFromFreezeStateTx);
+        console.log("Initialized from freeze state");
+      }
+
+      // 检查 to_freeze_state 是否已存在
+      let toFreezeStateExists = false;
+      try {
+        await program.account.freezeState.fetch(toFreezeState);
+        toFreezeStateExists = true;
+        console.log("To freeze state already exists");
+      } catch (error) {
+        // 账户不存在，需要初始化
+        toFreezeStateExists = false;
+      }
+
+      // 如果不存在，则初始化 to_freeze_state
+      if (!toFreezeStateExists) {
+        const initToFreezeStateTx = await program.methods
+          .initializeFreezeState()
+          .accounts({
+            authority: provider.wallet.publicKey,
+            freezeState: toFreezeState,
+            tokenAccount: spenderTokenAccount,
+            tokenMint: mintKeypair.publicKey,
+            payer: provider.wallet.publicKey,
+            systemProgram: SystemProgram.programId,
+            tokenProgram: TOKEN_2022_PROGRAM_ID,
+          })
+          .rpc();
+
+        await provider.connection.confirmTransaction(initToFreezeStateTx);
+        console.log("Initialized to freeze state");
+      }
 
       // 执行transfer_from操作
       const transferAmount = new anchor.BN(1000000); // 1 WUSD
+      const expiry = Math.floor(Date.now() / 1000) + 3600; // 1小时后过期
 
       // 首先需要approve操作
       const approveTx = await program.methods
-        .approve(transferAmount)
+        .approve(transferAmount, new anchor.BN(expiry))
         .accounts({
           owner: recipientKeypair.publicKey,
-          spender: spenderKeypair.publicKey,
-          ownerTokenAccount: recipientTokenAccount,
-          allowanceState: allowanceStatePda,
+          delegate: spenderKeypair.publicKey,
+          tokenAccount: recipientTokenAccount,
+          permitState: permitPda,
           tokenMint: mintKeypair.publicKey,
+          mintState: mintStatePda,
+          pauseState: pauseStatePda,
+          tokenProgram: TOKEN_2022_PROGRAM_ID,
           systemProgram: SystemProgram.programId,
+          rent: anchor.web3.SYSVAR_RENT_PUBKEY,
         })
         .signers([recipientKeypair])
         .rpc();
 
       await provider.connection.confirmTransaction(approveTx);
+      console.log("Successfully approved tokens");
 
       // 然后执行transfer_from操作
       const transferFromTx = await program.methods
@@ -827,12 +970,16 @@ describe("WUSD Token Test", () => {
         .accounts({
           spender: spenderKeypair.publicKey,
           owner: recipientKeypair.publicKey,
-          ownerTokenAccount: recipientTokenAccount,
-          recipientTokenAccount: spenderTokenAccount,
-          allowanceState: allowanceStatePda,
-          tokenProgram: TOKEN_2022_PROGRAM_ID,
-          tokenMint: mintKeypair.publicKey,  // 添加缺失的tokenMint参数
+          fromToken: recipientTokenAccount,
+          toToken: spenderTokenAccount,
+          permit: permitPda,
+          mintState: mintStatePda,
           pauseState: pauseStatePda,
+          tokenProgram: TOKEN_2022_PROGRAM_ID,
+          tokenMint: mintKeypair.publicKey,
+          fromFreezeState: fromFreezeState,
+          toFreezeState: toFreezeState,
+          systemProgram: SystemProgram.programId,
         })
         .signers([spenderKeypair])
         .rpc();

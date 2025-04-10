@@ -191,6 +191,7 @@ pub mod wusd_token {
 #[instruction(decimals: u8)]
 pub struct Initialize<'info> {
     /// 管理员账户
+    /// CHECK: 此账户用于验证签名和支付租金
     #[account(mut)]
     pub authority: Signer<'info>,
 
@@ -214,6 +215,7 @@ pub struct Initialize<'info> {
 
     /// 代币铸币账户 - 使用已存在的账户
     #[account(
+        mut,
         mint::authority = authority.key(),
         constraint = token_mint.decimals == decimals
     )]

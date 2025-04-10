@@ -72,7 +72,7 @@ pub struct AuthorityState {
 impl AuthorityState {
     /// 权限管理状态账户大小
     /// discriminator + admin + minter_role + burner_role + pauser_role
-    pub const SIZE: usize = 8 + 32 + 4 + 4 + 4 + 4; // 32 for admin, 4 for each Vec length
+    pub const SIZE: usize = 8 + 32 + (4 + 32) + (4 + 32) + (4 + 32) + (4 + 32); // 8 for discriminator, 32 for admin, 4 for each Vec length, 32 for each Pubkey
 
     pub fn initialize(admin: Pubkey) -> Self {
         Self {
