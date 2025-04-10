@@ -198,16 +198,24 @@ describe("WUSD Token Test", () => {
             const { blockhash } = await provider.connection.getLatestBlockhash();
             tx.recentBlockhash = blockhash;
             tx.feePayer = provider.wallet.publicKey;
-
-            // 签名交易
-            tx.partialSign(mintKeypair);
-
-            console.log("Sending transaction to create mint account...");
-            await provider.sendAndConfirm(tx, [mintKeypair]);
-            console.log("Mint account created successfully");
+            
+            // 添加钱包和mintKeypair签名
+            tx.sign(mintKeypair);
+            tx.partialSign(provider.wallet.payer);
+            
+            console.log("Sending transaction to initialize contract state...");
+            const signature = await provider.connection.sendRawTransaction(tx.serialize(), {
+              skipPreflight: true,
+              maxRetries: 3
+            });
+            await provider.connection.confirmTransaction(signature);
+            
+            console.log("Contract state initialization transaction:", signature);
+            console.log("Contract state initialized successfully");
+            await sleep(1000); // 等待状态更新
           } catch (error) {
-            console.error("Error creating mint account:", error);
-            throw new Error("Failed to create mint account");
+            console.error("Error in initialization:", error);
+            throw error;
           }
         } else {
           console.log("Mint account already exists, skipping creation");
@@ -301,75 +309,19 @@ describe("WUSD Token Test", () => {
               const { blockhash } = await provider.connection.getLatestBlockhash();
               tx.recentBlockhash = blockhash;
               tx.feePayer = provider.wallet.publicKey;
-
-              // 签名交易
-              tx.partialSign(mintKeypair);
-
-              console.log("Sending transaction to create mint account...");
-              await provider.sendAndConfirm(tx, [mintKeypair]);
-              console.log("Mint account created successfully");
-              await sleep(1000); // 等待账户更新
-            } catch (error) {
-              console.error("Error creating mint account:", error);
-              throw new Error("Failed to create mint account");
-            }
-          } else {
-            console.log("Mint account already exists, skipping creation");
-          }
-
-          // 为minter和pauser空投SOL
-          try {
-            const airdropTx1 = await provider.connection.requestAirdrop(
-              minterKeypair.publicKey,
-              1 * LAMPORTS_PER_SOL
-            );
-            await provider.connection.confirmTransaction(airdropTx1);
-            console.log("Airdropped SOL to minter:", minterKeypair.publicKey.toString());
-            
-            const airdropTx2 = await provider.connection.requestAirdrop(
-              pauserKeypair.publicKey,
-              1 * LAMPORTS_PER_SOL
-            );
-            await provider.connection.confirmTransaction(airdropTx2);
-            console.log("Airdropped SOL to pauser:", pauserKeypair.publicKey.toString());
-          } catch (error) {
-            console.error("Error airdropping SOL to minter/pauser:", error);
-            throw new Error("Failed to airdrop SOL to minter/pauser");
-          }
-
-          // 检查PDA账户是否已存在
-          console.log("Checking PDA accounts status...");
-          const mintStateInfo = await provider.connection.getAccountInfo(mintStatePda);
-          const authorityStateInfo = await provider.connection.getAccountInfo(authorityPda);
-          const pauseStateInfo = await provider.connection.getAccountInfo(pauseStatePda);
-
-          console.log("PDA accounts status:");
-          console.log("- Mint State:", mintStateInfo ? "exists" : "not exists");
-          console.log("- Authority State:", authorityStateInfo ? "exists" : "not exists");
-          console.log("- Pause State:", pauseStateInfo ? "exists" : "not exists");
-
-          // 如果任何PDA账户不存在，则执行初始化
-          if (!mintStateInfo || !authorityStateInfo || !pauseStateInfo) {
-            console.log("Initializing PDA accounts...");
-            try {
-              const tx = await program.methods
-                .initialize(6) // 传入6位小数
-                .accounts({
-                  authority: provider.wallet.publicKey,
-                  minter: minterKeypair.publicKey,
-                  pauser: pauserKeypair.publicKey,
-                  authorityState: authorityPda,
-                  tokenMint: mintKeypair.publicKey,
-                  mintState: mintStatePda,
-                  pauseState: pauseStatePda,
-                  systemProgram: SystemProgram.programId,
-                  tokenProgram: TOKEN_2022_PROGRAM_ID,
-                })
-                .signers([mintKeypair]) // 添加mintKeypair作为签名者
-                .rpc();
-
-              console.log("PDA accounts initialization transaction:", tx);
-              await provider.connection.confirmTransaction(tx);
+              
+              // 签名交易 - 使用wallet和mintKeypair共同签名
+              const wallet = provider.wallet as anchor.Wallet;
+              tx.sign(mintKeypair, wallet.payer);
+              
+              console.log("Sending transaction to initialize PDA accounts...");
+              const signature = await provider.connection.sendRawTransaction(tx.serialize(), {
+                skipPreflight: true,
+                maxRetries: 3
+              });
+              await provider.connection.confirmTransaction(signature);
+              
+              console.log("PDA accounts initialization transaction:", signature);
               console.log("PDA accounts initialized successfully");
               await sleep(1000); // 等待状态更新
 
@@ -426,7 +378,12 @@ describe("WUSD Token Test", () => {
           // 执行初始化流程
           console.log("Initializing contract state...");
           try {
-            await program.methods
+            // 创建一个新的交易对象
+            const tx = new anchor.web3.Transaction();
+            
+            // 添加初始化指令 - 注意：不要尝试重新初始化已存在的token_mint账户
+            // 使用已存在的mintKeypair账户，而不是尝试重新创建它
+            const initIx = await program.methods
               .initialize(6) // 传入6位小数
               .accounts({
                 authority: provider.wallet.publicKey,
@@ -438,10 +395,34 @@ describe("WUSD Token Test", () => {
                 pauseState: pauseStatePda,
                 systemProgram: SystemProgram.programId,
                 tokenProgram: TOKEN_2022_PROGRAM_ID,
+                rent: anchor.web3.SYSVAR_RENT_PUBKEY,
               })
-              .signers([mintKeypair])
-              .rpc();
-
+              .signers([]) // 不添加mintKeypair作为签名者，因为我们不需要重新初始化它
+              .instruction();
+            
+            tx.add(initIx);
+            
+            // 获取最新区块哈希
+            const { blockhash } = await provider.connection.getLatestBlockhash();
+            tx.recentBlockhash = blockhash;
+            tx.feePayer = provider.wallet.publicKey;
+            
+            // 只使用钱包签名，不需要mintKeypair签名
+            // 因为mintKeypair账户已经存在，不需要重新初始化
+            
+            // 添加钱包和mintKeypair签名
+            const wallet = provider.wallet as anchor.Wallet;
+            tx.sign(mintKeypair);
+            tx.sign(wallet.payer);
+            
+            console.log("Sending transaction to initialize contract state...");
+            const signature = await provider.connection.sendRawTransaction(tx.serialize(), {
+              skipPreflight: true,
+              maxRetries: 3
+            });
+            await provider.connection.confirmTransaction(signature);
+            
+            console.log("Contract state initialization transaction:", signature);
             console.log("Contract state initialized successfully");
             await sleep(1000); // 等待状态更新
           } catch (error) {
@@ -693,7 +674,8 @@ describe("WUSD Token Test", () => {
           fromToken: recipientTokenAccount,
           toToken: newRecipientTokenAccount,
           tokenProgram: TOKEN_2022_PROGRAM_ID,
-          tokenMint: mintKeypair.publicKey,  // 添加缺失的tokenMint参数
+          tokenMint: mintKeypair.publicKey,
+          authorityState: authorityPda,
           pauseState: pauseStatePda,
           fromFreezeState: fromFreezeState,
           toFreezeState: toFreezeState,

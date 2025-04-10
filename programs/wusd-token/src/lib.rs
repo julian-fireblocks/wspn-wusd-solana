@@ -212,12 +212,10 @@ pub struct Initialize<'info> {
     )]
     pub authority_state: Account<'info, AuthorityState>,
 
-    /// 代币铸币账户 - 极简化约束条件
+    /// 代币铸币账户 - 使用已存在的账户
     #[account(
-        init,
-        payer = authority,
-        mint::decimals = decimals,
-        mint::authority = authority.key()
+        mint::authority = authority.key(),
+        constraint = token_mint.decimals == decimals
     )]
     pub token_mint: InterfaceAccount<'info, Mint>,
     
