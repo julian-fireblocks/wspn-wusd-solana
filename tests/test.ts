@@ -292,10 +292,9 @@ describe("wusd-token", () => {
     );
 
     // 验证转账金额
+    const expectedFromBalance = amount.sub(transferAmount);
     assert(
-      new anchor.BN(fromTokenAccountInfo.amount.toString()).eq(
-        amount.sub(transferAmount)
-      ),
+      new anchor.BN(fromTokenAccountInfo.amount.toString()).eq(expectedFromBalance),
       "From account amount mismatch"
     );
     assert(
@@ -309,5 +308,141 @@ describe("wusd-token", () => {
     console.log("From account balance:", fromBalance, "WUSD");
     console.log("To account balance:", toBalance, "WUSD"); 
     console.log("Transfer completed successfully");
+  });
+
+  it("Transfer From WUSD", async () => {
+    // 创建委托账户
+    const delegate = anchor.web3.Keypair.generate();
+    await provider.connection.requestAirdrop(
+      delegate.publicKey,
+      anchor.web3.LAMPORTS_PER_SOL * 1
+    );
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    // 创建转账目标账户
+    const transferAmount = new anchor.BN(50000000000); // 50 WUSD
+    const transferRecipient = anchor.web3.Keypair.generate();
+    
+    // 为转账目标账户提供资金
+    await provider.connection.requestAirdrop(
+      transferRecipient.publicKey,
+      anchor.web3.LAMPORTS_PER_SOL * 1
+    );
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // 创建转账目标的token账户
+    const transferRecipientTokenAccount = await spl.createAccount(
+      provider.connection,
+      transferRecipient,
+      tokenMint.publicKey,
+      transferRecipient.publicKey,
+      undefined,
+      { commitment: 'confirmed' },
+      TOKEN_2022_PROGRAM_ID
+    );
+
+    // 创建目标账户的freezeState
+    const [transferFreezeState] = await anchor.web3.PublicKey.findProgramAddress(
+      [Buffer.from("freeze"), transferRecipientTokenAccount.toBuffer(), tokenMint.publicKey.toBuffer()],
+      program.programId
+    );
+
+    // 初始化目标账户的freezeState
+    await program.methods
+      .initializeFreezeState()
+      .accounts({
+        authority: admin.publicKey,
+        authorityState: authorityState,
+        tokenMint: tokenMint.publicKey,
+        freezeState: transferFreezeState,
+        tokenAccount: transferRecipientTokenAccount,
+        payer: admin.publicKey,
+        tokenProgram: TOKEN_2022_PROGRAM_ID,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .signers([admin])
+      .rpc();
+
+    // 创建permit_state账户
+    const [permitState] = await anchor.web3.PublicKey.findProgramAddress(
+      [Buffer.from("permit"), recipient.publicKey.toBuffer(), delegate.publicKey.toBuffer()],
+      program.programId
+    );
+
+    // 设置授权过期时间为1小时后
+    const currentTime = Math.floor(Date.now() / 1000);
+    const expiryTime = currentTime + 3600;
+
+    // 执行授权操作
+    await program.methods
+      .approve(transferAmount, new anchor.BN(expiryTime))
+      .accounts({
+        owner: recipient.publicKey,
+        delegate: delegate.publicKey,
+        tokenAccount: recipientTokenAccount,
+        permitState: permitState,
+        tokenMint: tokenMint.publicKey,
+        mintState: mintState,
+        pauseState: pauseState,
+        tokenProgram: TOKEN_2022_PROGRAM_ID,
+        systemProgram: anchor.web3.SystemProgram.programId,
+        clock: anchor.web3.SYSVAR_CLOCK_PUBKEY
+      })
+      .signers([recipient])
+      .rpc();
+
+    // 执行transfer_from操作
+    await program.methods
+      .transferFrom(transferAmount)
+      .accounts({
+        owner: recipient.publicKey,
+        spender: delegate.publicKey,
+        fromToken: recipientTokenAccount,
+        toToken: transferRecipientTokenAccount,
+        tokenMint: tokenMint.publicKey,
+        mintState: mintState,
+        pauseState: pauseState,
+        permit: permitState,
+        fromFreezeState: freezeState,
+        toFreezeState: transferFreezeState,
+        tokenProgram: TOKEN_2022_PROGRAM_ID,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .signers([delegate])
+      .rpc();
+
+    // 验证转账结果
+    const fromTokenAccountInfo = await spl.getAccount(
+      provider.connection,
+      recipientTokenAccount,
+      undefined,
+      TOKEN_2022_PROGRAM_ID
+    );
+
+    const toTokenAccountInfo = await spl.getAccount(
+      provider.connection,
+      transferRecipientTokenAccount,
+      undefined,
+      TOKEN_2022_PROGRAM_ID
+    );
+
+    // 验证转账金额
+    const previousTransferAmount = new anchor.BN(100000000000); // 100 WUSD from previous transfer
+    const expectedBalance = amount.sub(previousTransferAmount).sub(transferAmount);
+    assert(
+      new anchor.BN(fromTokenAccountInfo.amount.toString()).eq(expectedBalance),
+      "From account amount mismatch"
+    );
+    assert(
+      new anchor.BN(toTokenAccountInfo.amount.toString()).eq(transferAmount),
+      "To account amount mismatch"
+    );
+
+    // 输出转账后的账户余额
+    const fromBalance = new anchor.BN(fromTokenAccountInfo.amount.toString()).div(new anchor.BN(10 ** decimals)).toString();
+    const toBalance = new anchor.BN(toTokenAccountInfo.amount.toString()).div(new anchor.BN(10 ** decimals)).toString();
+    console.log("From account balance:", fromBalance, "WUSD");
+    console.log("To account balance:", toBalance, "WUSD"); 
+    console.log("Transfer From completed successfully");
   });
 });
