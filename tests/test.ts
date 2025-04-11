@@ -303,6 +303,11 @@ describe("wusd-token", () => {
       "To account amount mismatch"
     );
 
+    // 输出转账后的账户余额
+    const fromBalance = new anchor.BN(fromTokenAccountInfo.amount.toString()).div(new anchor.BN(10 ** decimals)).toString();
+    const toBalance = new anchor.BN(toTokenAccountInfo.amount.toString()).div(new anchor.BN(10 ** decimals)).toString();
+    console.log("From account balance:", fromBalance, "WUSD");
+    console.log("To account balance:", toBalance, "WUSD"); 
     console.log("Transfer completed successfully");
   });
 });
