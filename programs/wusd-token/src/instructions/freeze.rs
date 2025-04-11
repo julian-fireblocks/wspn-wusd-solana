@@ -115,6 +115,12 @@ pub struct InitializeFreezeState<'info> {
     pub token_mint: InterfaceAccount<'info, anchor_spl::token_interface::Mint>,
     #[account(mut)]
     pub payer: Signer<'info>,
+    #[account(
+        seeds = [b"authority", token_mint.key().as_ref()],
+        bump,
+        constraint = authority_state.is_admin(authority.key()) @ WusdError::Unauthorized
+    )]
+    pub authority_state: Account<'info, AuthorityState>,
     pub token_program: Program<'info, Token2022>,
     pub system_program: Program<'info, System>,
 }

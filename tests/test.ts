@@ -8,17 +8,25 @@ import { assert } from "chai";
 describe("wusd-token", () => {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
-
+  const minter = anchor.web3.Keypair.generate();
+  const pauser = anchor.web3.Keypair.generate();
   const program = anchor.workspace.WusdToken as Program<WusdToken>;
+  
+  // 共享变量
+  const admin = anchor.web3.Keypair.generate();
+  const tokenMint = anchor.web3.Keypair.generate();
+  const decimals = 9;
+  const recipient = anchor.web3.Keypair.generate();
+  const amount = new anchor.BN(1000000000000); // 1000 WUSD
+  let recipientTokenAccount: anchor.web3.PublicKey;
+  let authorityState: anchor.web3.PublicKey;
+  let mintState: anchor.web3.PublicKey;
+  let pauseState: anchor.web3.PublicKey;
+  let freezeState: anchor.web3.PublicKey;
+  let authorityBump: number;
+  let freezeBump: number;
 
   it("Initialize Contract", async () => {
-    // 准备测试账户
-    const admin = anchor.web3.Keypair.generate();
-    const minter = anchor.web3.Keypair.generate();
-    const pauser = anchor.web3.Keypair.generate();
-    const tokenMint = anchor.web3.Keypair.generate();
-    const decimals = 9;
-    
     // 为管理员账户提供资金
     await provider.connection.requestAirdrop(
       admin.publicKey,
@@ -45,20 +53,37 @@ describe("wusd-token", () => {
     await new Promise(resolve => setTimeout(resolve, 2000));
 
     // 创建authorityState账户
-    const [authorityState] = await anchor.web3.PublicKey.findProgramAddress(
+    [authorityState, authorityBump] = await anchor.web3.PublicKey.findProgramAddress(
       [Buffer.from("authority"), tokenMint.publicKey.toBuffer()],
       program.programId
     );
 
     // 创建mintState账户
-    const [mintState] = await anchor.web3.PublicKey.findProgramAddress(
+    [mintState] = await anchor.web3.PublicKey.findProgramAddress(
       [Buffer.from("mint_state"), tokenMint.publicKey.toBuffer()],
       program.programId
     );
 
     // 创建pauseState账户
-    const [pauseState] = await anchor.web3.PublicKey.findProgramAddress(
+    [pauseState] = await anchor.web3.PublicKey.findProgramAddress(
       [Buffer.from("pause_state"), tokenMint.publicKey.toBuffer()],
+      program.programId
+    );
+
+    // 创建接收者的token账户
+    recipientTokenAccount = await spl.createAccount(
+      provider.connection,
+      admin,
+      tokenMint.publicKey,
+      admin.publicKey,
+      undefined,
+      { commitment: 'confirmed' },
+      TOKEN_2022_PROGRAM_ID
+    );
+
+    // 创建freezeState账户
+    [freezeState, freezeBump] = await anchor.web3.PublicKey.findProgramAddress(
+      [Buffer.from("freeze"), recipientTokenAccount.toBuffer(), tokenMint.publicKey.toBuffer()],
       program.programId
     );
 
@@ -92,5 +117,97 @@ describe("wusd-token", () => {
     const mintStateAccount = await program.account.mintState.fetch(mintState);
     assert(mintStateAccount.mint.equals(tokenMint.publicKey), "Mint pubkey mismatch");
     assert(mintStateAccount.decimals === decimals, "Decimals mismatch");
+
+    // 初始化freezeState账户
+    await program.methods
+      .initializeFreezeState()
+      .accounts({
+        authority: admin.publicKey,
+        authorityState: authorityState,
+        tokenMint: tokenMint.publicKey,
+        freezeState: freezeState,
+        tokenAccount: recipientTokenAccount, 
+        payer: admin.publicKey,
+        tokenProgram: TOKEN_2022_PROGRAM_ID,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .signers([admin])
+      .rpc();
+    console.log("Contract initialized successfully");  
+  });
+
+  it("Mint WUSD", async () => {
+    // 为接收者账户提供资金
+    await provider.connection.requestAirdrop(
+      recipient.publicKey,
+      anchor.web3.LAMPORTS_PER_SOL * 1
+    );
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // 创建接收者的token账户
+    recipientTokenAccount = await spl.createAccount(
+      provider.connection,
+      recipient,
+      tokenMint.publicKey,
+      recipient.publicKey,
+      undefined,
+      { commitment: 'confirmed' },
+      TOKEN_2022_PROGRAM_ID
+    );
+
+    // 创建freezeState账户
+    [freezeState, freezeBump] = await anchor.web3.PublicKey.findProgramAddress(
+      [Buffer.from("freeze"), recipientTokenAccount.toBuffer(), tokenMint.publicKey.toBuffer()],
+      program.programId
+    );
+
+    // 初始化freezeState账户
+    await program.methods
+      .initializeFreezeState()
+      .accounts({
+        authority: admin.publicKey,
+        authorityState: authorityState,
+        tokenMint: tokenMint.publicKey,
+        freezeState: freezeState,
+        tokenAccount: recipientTokenAccount,
+        payer: admin.publicKey,
+        tokenProgram: TOKEN_2022_PROGRAM_ID,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .signers([admin])
+      .rpc(); 
+
+    // 调用mint方法
+    console.log("Attempting to mint", amount.div(new anchor.BN(10 ** decimals)).toString(), "WUSD");
+    await program.methods
+      .mint(amount, authorityBump)
+      .accounts({
+        authority: minter.publicKey,
+        tokenMint: tokenMint.publicKey,
+        tokenAccount: recipientTokenAccount,
+        authorityState: authorityState,
+        mintState: mintState,
+        pauseState: pauseState,
+        freezeState: freezeState,
+        tokenProgram: TOKEN_2022_PROGRAM_ID,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .signers([minter])
+      .rpc();
+
+    // 验证铸币结果
+    const tokenAccountInfo = await spl.getAccount(
+      provider.connection,
+      recipientTokenAccount,
+      undefined,
+      TOKEN_2022_PROGRAM_ID
+    );
+
+    // 将实际铸币数量转换为WUSD单位
+    const mintedAmount = new anchor.BN(tokenAccountInfo.amount.toString());
+    const mintedWUSD = mintedAmount.div(new anchor.BN(10 ** decimals)).toString();
+    console.log("Successfully minted", mintedWUSD, "WUSD to recipient");
+
+    assert(mintedAmount.eq(amount), "Amount mismatch");
   });
 });
