@@ -557,7 +557,7 @@ describe("wusd-token", () => {
       .burn(burnAmount, authorityBump)
       .accounts({
         authority: burner.publicKey,
-        tokenMint: tokenMint.publicKey,
+        mint: tokenMint.publicKey,
         tokenAccount: recipientTokenAccount,
         authorityState: authorityState,
         mintState: mintState,
