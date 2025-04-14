@@ -63,7 +63,8 @@ pub struct Burn<'info> {
     pub mint: InterfaceAccount<'info, anchor_spl::token_interface::Mint>, 
     #[account(
         mut,
-        constraint = token_account.owner == authority.key() @ WusdError::Unauthorized
+        constraint = token_account.owner == authority.key() @ WusdError::Unauthorized,
+        constraint = token_account.mint == mint.key() @ WusdError::InvalidMint
     )]
     pub token_account: InterfaceAccount<'info, anchor_spl::token_interface::TokenAccount>,
     pub token_program: Program<'info, Token2022>,
