@@ -8,24 +8,28 @@ use anchor_spl::token_2022::{self, burn as token_burn};
 /// * `ctx` - 销毁上下文
 /// * `amount` - 销毁数量
 /// * `bump` - PDA的bump值
-pub fn burn(ctx: Context<Burn>, amount: u64, bump: u8) -> Result<()> {
+pub fn burn(ctx: Context<Burn>, amount: u64) -> Result<()> {
     // 验证金额有效性
     require!(amount > 0, WusdError::InvalidAmount);
     // 验证余额充足
     require!(
         ctx.accounts.token_account.amount >= amount,
         WusdError::InsufficientBalance
-    ); 
+    );
 
     // 执行销毁操作
     let mint_key = ctx.accounts.mint.key();
-    let seeds = &[b"authority", mint_key.as_ref(), &[bump]];
+    let seeds = &[
+        b"authority" as &[u8], 
+        mint_key.as_ref(), 
+        &[ctx.bumps.authority_state]
+    ];
 
     // 确保使用正确的CPI上下文和签名者
     let cpi_accounts = token_2022::Burn {
         mint: ctx.accounts.mint.to_account_info(),
         from: ctx.accounts.token_account.to_account_info(),
-        authority: ctx.accounts.authority_state.to_account_info(),
+        authority: ctx.accounts.authority.to_account_info(),
     };
     
     token_burn(
@@ -46,7 +50,7 @@ pub fn burn(ctx: Context<Burn>, amount: u64, bump: u8) -> Result<()> {
 }
 
 #[derive(Accounts)]
-#[instruction(amount: u64, bump: u8)]
+#[instruction(amount: u64)]
 pub struct Burn<'info> { 
     pub authority: Signer<'info>,
     #[account(
@@ -56,11 +60,11 @@ pub struct Burn<'info> {
     )]
     pub authority_state: Account<'info, AuthorityState>, 
     #[account(mut)]
-    pub mint: InterfaceAccount<'info, anchor_spl::token_interface::Mint>,
+    pub mint: InterfaceAccount<'info, anchor_spl::token_interface::Mint>, 
     #[account(
         mut,
-        constraint = token_account.mint == mint.key() @ WusdError::InvalidMint,
-        constraint = token_account.owner == authority.key() @ WusdError::Unauthorized
+        constraint = token_account.owner == authority.key() @ WusdError::Unauthorized,
+        constraint = token_account.mint == mint.key() @ WusdError::InvalidMint
     )]
     pub token_account: InterfaceAccount<'info, anchor_spl::token_interface::TokenAccount>,
     pub token_program: Program<'info, Token2022>,

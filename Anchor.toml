@@ -12,7 +12,7 @@ wusd_token = "4xPf5n8CbNUm8AT5DVgdWaPT3nVTPKU9oGjreiGBK3fB"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
+cluster = "https://api.devnet.solana.com"
 wallet = "./deploy-keypair.json"
 
 [workspace]
@@ -27,6 +27,6 @@ shutdown_wait = 2000
 upgradeable = true
 
 [test.validator]
-bind_address = "localhost"
+bind_address = "https://api.devnet.solana.com"
 ledger = ".anchor/test-ledger"
 rpc_port = 8899

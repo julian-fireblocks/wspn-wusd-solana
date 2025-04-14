@@ -168,8 +168,8 @@ pub mod wusd_token {
     }
 
     /// 销毁WUSD代币
-    pub fn burn(ctx: Context<Burn>, amount: u64, bump: u8) -> Result<()> {
-        instructions::burn::burn(ctx, amount, bump)
+    pub fn burn(ctx: Context<Burn>, amount: u64) -> Result<()> {
+        instructions::burn::burn(ctx, amount)
     }   
     /// 冻结账户
     pub fn freeze_account(ctx: Context<FreezeOperationAccounts>) -> Result<()> { 
