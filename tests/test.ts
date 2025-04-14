@@ -36,7 +36,7 @@ describe("wusd-token", () => {
   let pauseState: anchor.web3.PublicKey;
   let freezeState: anchor.web3.PublicKey;
   let authorityBump: number;
-  let freezeBump: number;
+  let freezeBump: number; 
 
   it("Initialize Contract", async () => {
     // 为管理员账户提供资金
@@ -522,23 +522,80 @@ describe("wusd-token", () => {
       burner.publicKey,
       anchor.web3.LAMPORTS_PER_SOL * 1
     );
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await new Promise((resolve) => setTimeout(resolve, 2000)); 
+
+    // 创建burner的token账户
+    const burnerTokenAccount = await spl.createAccount(
+      provider.connection,
+      burner,
+      tokenMint.publicKey,
+      burner.publicKey,
+      undefined,
+      { commitment: "confirmed" },
+      TOKEN_2022_PROGRAM_ID
+    ); 
+
+    // 创建burner的freezeState
+    const [burnerFreezeState] = await anchor.web3.PublicKey.findProgramAddress(
+      [
+        Buffer.from("freeze"),
+        burnerTokenAccount.toBuffer(),
+        tokenMint.publicKey.toBuffer(),
+      ],
+      program.programId
+    );
+
+    // 初始化burner的freezeState
+    await program.methods
+      .initializeFreezeState()
+      .accounts({
+        authority: admin.publicKey,
+        authorityState: authorityState,
+        tokenMint: tokenMint.publicKey,
+        freezeState: burnerFreezeState,
+        tokenAccount: burnerTokenAccount,
+        payer: admin.publicKey,
+        tokenProgram: TOKEN_2022_PROGRAM_ID,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .signers([admin])
+      .rpc();
 
     // 设置Burner角色
     await program.methods
       .setRole({ burner: {} }, burner.publicKey, true)
       .accounts({
         admin: admin.publicKey,
+        pauseState: pauseState,
         authorityState: authorityState,
         tokenMint: tokenMint.publicKey,
       })
       .signers([admin])
       .rpc();
+    await new Promise((resolve) => setTimeout(resolve, 2000));   
 
-    // 获取当前账户余额
+    // 直接mint 100 WUSD到burner账户
+    const mintAmount = new anchor.BN(100000000000); // 100 WUSD
+    await program.methods
+      .mint(mintAmount, authorityBump)
+      .accounts({
+        authority: minter.publicKey,
+        tokenMint: tokenMint.publicKey,
+        tokenAccount: burnerTokenAccount,
+        authorityState: authorityState,
+        mintState: mintState,
+        pauseState: pauseState,
+        freezeState: burnerFreezeState,
+        tokenProgram: TOKEN_2022_PROGRAM_ID,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .signers([minter])
+      .rpc();
+
+    // 获取burner账户余额
     const beforeBurnBalance = await spl.getAccount(
       provider.connection,
-      recipientTokenAccount,
+      burnerTokenAccount,
       undefined,
       TOKEN_2022_PROGRAM_ID
     );
@@ -547,22 +604,19 @@ describe("wusd-token", () => {
     const beforeBurnWUSD = new anchor.BN(beforeBurnBalance.amount.toString())
       .div(new anchor.BN(10 ** decimals))
       .toString();
-    console.log("Account balance before burn:", beforeBurnWUSD, "WUSD");
-
-    // 要销毁的金额
-    const burnAmount = new anchor.BN(20000000000); // 20 WUSD
+    console.log("Burner account balance before burn:", beforeBurnWUSD, "WUSD");
 
     // 执行burn操作
     await program.methods
-      .burn(burnAmount, authorityBump)
+      .burn(mintAmount)
       .accounts({
         authority: burner.publicKey,
         mint: tokenMint.publicKey,
-        tokenAccount: recipientTokenAccount,
+        tokenAccount: burnerTokenAccount,
         authorityState: authorityState,
         mintState: mintState,
         pauseState: pauseState,
-        freezeState: freezeState,
+        freezeState: burnerFreezeState,
         tokenProgram: TOKEN_2022_PROGRAM_ID,
         systemProgram: anchor.web3.SystemProgram.programId,
       })
@@ -572,18 +626,14 @@ describe("wusd-token", () => {
     // 验证burn后的账户余额
     const afterBurnBalance = await spl.getAccount(
       provider.connection,
-      recipientTokenAccount,
+      burnerTokenAccount,
       undefined,
       TOKEN_2022_PROGRAM_ID
     );
 
-    // 计算预期余额
-    const previousTransferAmount = new anchor.BN(150000000000); // 150 WUSD from previous transfers
-    const expectedBalance = amount.sub(previousTransferAmount).sub(burnAmount);
-
     // 验证余额
     assert(
-      new anchor.BN(afterBurnBalance.amount.toString()).eq(expectedBalance),
+      new anchor.BN(afterBurnBalance.amount.toString()).eq(new anchor.BN(0)),
       "Balance after burn mismatch"
     );
 
@@ -591,7 +641,7 @@ describe("wusd-token", () => {
     const finalBalance = new anchor.BN(afterBurnBalance.amount.toString())
       .div(new anchor.BN(10 ** decimals))
       .toString();
-    console.log("Account balance after burn:", finalBalance, "WUSD");
+    console.log("Burner account balance after burn:", finalBalance, "WUSD");
     console.log("Burn completed successfully");
   });
 });
