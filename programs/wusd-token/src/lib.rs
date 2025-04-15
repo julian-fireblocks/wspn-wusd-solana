@@ -16,7 +16,7 @@ use anchor_spl::token_interface::Mint;
 use spl_token_2022::instruction::AuthorityType;    
 use state::{AuthorityState, MintState, PauseState}; 
 
-declare_id!("4xPf5n8CbNUm8AT5DVgdWaPT3nVTPKU9oGjreiGBK3fB");
+declare_id!("3NDAD3Duff9rftUo2amTjTtf2KMGpxHvn7qZ5cz9p97Q");
 
 // 辅助函数：初始化状态账户，减少栈使用
 #[inline(always)]

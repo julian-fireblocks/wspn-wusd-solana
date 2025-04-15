@@ -12,16 +12,38 @@ describe("wusd-token", () => {
   const pauser = anchor.web3.Keypair.generate();
   const program = anchor.workspace.WusdToken as Program<WusdToken>;
 
-  // 为minter和pauser账户提供资金
+  // 从deploy-keypair.json导入本地账号
+  let localWallet: anchor.web3.Keypair;
+  
   before(async () => {
-    await provider.connection.requestAirdrop(
-      minter.publicKey,
-      anchor.web3.LAMPORTS_PER_SOL * 10
+    // 从deploy-keypair.json文件中读取密钥
+    const keypairData = require("../deploy-keypair.json");
+    const localWalletBytes = new Uint8Array(keypairData);
+    localWallet = anchor.web3.Keypair.fromSecretKey(localWalletBytes);
+    console.log("Local wallet public key:", localWallet.publicKey.toBase58());
+    
+    // 从本地账号转账SOL给minter和pauser账户
+    
+    // 转账给minter
+    const transferToMinter = new anchor.web3.Transaction().add(
+      anchor.web3.SystemProgram.transfer({
+        fromPubkey: localWallet.publicKey,
+        toPubkey: minter.publicKey,
+        lamports: anchor.web3.LAMPORTS_PER_SOL * 3
+      })
     );
-    await provider.connection.requestAirdrop(
-      pauser.publicKey,
-      anchor.web3.LAMPORTS_PER_SOL * 10
+    await provider.connection.sendTransaction(transferToMinter, [localWallet]);
+    
+    // 转账给pauser
+    const transferToPauser = new anchor.web3.Transaction().add(
+      anchor.web3.SystemProgram.transfer({
+        fromPubkey: localWallet.publicKey,
+        toPubkey: pauser.publicKey,
+        lamports: anchor.web3.LAMPORTS_PER_SOL * 3
+      })
     );
+    await provider.connection.sendTransaction(transferToPauser, [localWallet]);
+    
     await new Promise((resolve) => setTimeout(resolve, 2000));
   });
   // 共享变量
@@ -39,11 +61,18 @@ describe("wusd-token", () => {
   let freezeBump: number; 
 
   it("Initialize Contract", async () => {
-    // 为管理员账户提供资金
-    await provider.connection.requestAirdrop(
-      admin.publicKey,
-      anchor.web3.LAMPORTS_PER_SOL * 10
+    // 从本地账号转账SOL给管理员账户
+    
+    // 转账给admin
+    const transferToAdmin = new anchor.web3.Transaction().add(
+      anchor.web3.SystemProgram.transfer({
+        fromPubkey: localWallet.publicKey,
+        toPubkey: admin.publicKey,
+        lamports: anchor.web3.LAMPORTS_PER_SOL * 3
+      })
     );
+    await provider.connection.sendTransaction(transferToAdmin, [localWallet]);
+    
     // 等待资金到账
     await new Promise((resolve) => setTimeout(resolve, 3000));
     console.log("Admin", admin.publicKey.toBase58());
@@ -166,11 +195,15 @@ describe("wusd-token", () => {
   });
 
   it("Mint WUSD", async () => {
-    // 为接收者账户提供资金
-    await provider.connection.requestAirdrop(
-      recipient.publicKey,
-      anchor.web3.LAMPORTS_PER_SOL * 1
+    // 从本地账号转账SOL给接收者账户
+    const transferToRecipient = new anchor.web3.Transaction().add(
+      anchor.web3.SystemProgram.transfer({
+        fromPubkey: localWallet.publicKey,
+        toPubkey: recipient.publicKey,
+        lamports: anchor.web3.LAMPORTS_PER_SOL * 3
+      })
     );
+    await provider.connection.sendTransaction(transferToRecipient, [localWallet]);
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
     // 创建接收者的token账户
@@ -255,11 +288,16 @@ describe("wusd-token", () => {
     const transferAmount = new anchor.BN(100000000000); // 100 WUSD
     const transferRecipient = anchor.web3.Keypair.generate();
 
-    // 为转账目标账户提供资金
-    await provider.connection.requestAirdrop(
-      transferRecipient.publicKey,
-      anchor.web3.LAMPORTS_PER_SOL * 1
+    // 从本地账号转账SOL给转账目标账户
+    // 转账给transferRecipient
+    const transferToTransferRecipient = new anchor.web3.Transaction().add(
+      anchor.web3.SystemProgram.transfer({
+        fromPubkey: localWallet.publicKey,
+        toPubkey: transferRecipient.publicKey,
+        lamports: anchor.web3.LAMPORTS_PER_SOL * 3
+      })
     );
+    await provider.connection.sendTransaction(transferToTransferRecipient, [localWallet]);
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
     // 创建转账目标的token账户
@@ -367,21 +405,31 @@ describe("wusd-token", () => {
   it("Transfer From WUSD", async () => {
     // 创建委托账户
     const delegate = anchor.web3.Keypair.generate();
-    await provider.connection.requestAirdrop(
-      delegate.publicKey,
-      anchor.web3.LAMPORTS_PER_SOL * 1
+    // 从本地账号转账SOL给委托账户
+    const transferToDelegate = new anchor.web3.Transaction().add(
+      anchor.web3.SystemProgram.transfer({
+        fromPubkey: localWallet.publicKey,
+        toPubkey: delegate.publicKey,
+        lamports: anchor.web3.LAMPORTS_PER_SOL * 3
+      })
     );
+    await provider.connection.sendTransaction(transferToDelegate, [localWallet]);
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
     // 创建转账目标账户
     const transferAmount = new anchor.BN(50000000000); // 50 WUSD
     const transferRecipient = anchor.web3.Keypair.generate();
 
-    // 为转账目标账户提供资金
-    await provider.connection.requestAirdrop(
-      transferRecipient.publicKey,
-      anchor.web3.LAMPORTS_PER_SOL * 1
+    // 从本地账号转账SOL给转账目标账户
+    // 转账给transferRecipient
+    const transferToTransferRecipient = new anchor.web3.Transaction().add(
+      anchor.web3.SystemProgram.transfer({
+        fromPubkey: localWallet.publicKey,
+        toPubkey: transferRecipient.publicKey,
+        lamports: anchor.web3.LAMPORTS_PER_SOL * 3
+      })
     );
+    await provider.connection.sendTransaction(transferToTransferRecipient, [localWallet]);
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
     // 创建转账目标的token账户
@@ -518,10 +566,15 @@ describe("wusd-token", () => {
   it("Burn WUSD", async () => {
     // 创建burner账户
     const burner = anchor.web3.Keypair.generate();
-    await provider.connection.requestAirdrop(
-      burner.publicKey,
-      anchor.web3.LAMPORTS_PER_SOL * 1
+    // 从本地账号转账SOL给burner账户
+    const transferToBurner = new anchor.web3.Transaction().add(
+      anchor.web3.SystemProgram.transfer({
+        fromPubkey: localWallet.publicKey,
+        toPubkey: burner.publicKey,
+        lamports: anchor.web3.LAMPORTS_PER_SOL * 3
+      })
     );
+    await provider.connection.sendTransaction(transferToBurner, [localWallet]);
     await new Promise((resolve) => setTimeout(resolve, 2000)); 
 
     // 创建burner的token账户
