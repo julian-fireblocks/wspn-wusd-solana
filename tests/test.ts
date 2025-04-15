@@ -29,7 +29,7 @@ describe("wusd-token", () => {
       anchor.web3.SystemProgram.transfer({
         fromPubkey: localWallet.publicKey,
         toPubkey: minter.publicKey,
-        lamports: anchor.web3.LAMPORTS_PER_SOL * 3
+        lamports: anchor.web3.LAMPORTS_PER_SOL * 10
       })
     );
     await provider.connection.sendTransaction(transferToMinter, [localWallet]);
@@ -39,7 +39,7 @@ describe("wusd-token", () => {
       anchor.web3.SystemProgram.transfer({
         fromPubkey: localWallet.publicKey,
         toPubkey: pauser.publicKey,
-        lamports: anchor.web3.LAMPORTS_PER_SOL * 3
+        lamports: anchor.web3.LAMPORTS_PER_SOL * 10
       })
     );
     await provider.connection.sendTransaction(transferToPauser, [localWallet]);
@@ -68,7 +68,7 @@ describe("wusd-token", () => {
       anchor.web3.SystemProgram.transfer({
         fromPubkey: localWallet.publicKey,
         toPubkey: admin.publicKey,
-        lamports: anchor.web3.LAMPORTS_PER_SOL * 3
+        lamports: anchor.web3.LAMPORTS_PER_SOL * 10
       })
     );
     await provider.connection.sendTransaction(transferToAdmin, [localWallet]);
@@ -200,7 +200,7 @@ describe("wusd-token", () => {
       anchor.web3.SystemProgram.transfer({
         fromPubkey: localWallet.publicKey,
         toPubkey: recipient.publicKey,
-        lamports: anchor.web3.LAMPORTS_PER_SOL * 3
+        lamports: anchor.web3.LAMPORTS_PER_SOL * 10
       })
     );
     await provider.connection.sendTransaction(transferToRecipient, [localWallet]);
@@ -294,7 +294,7 @@ describe("wusd-token", () => {
       anchor.web3.SystemProgram.transfer({
         fromPubkey: localWallet.publicKey,
         toPubkey: transferRecipient.publicKey,
-        lamports: anchor.web3.LAMPORTS_PER_SOL * 3
+        lamports: anchor.web3.LAMPORTS_PER_SOL * 10
       })
     );
     await provider.connection.sendTransaction(transferToTransferRecipient, [localWallet]);
@@ -410,7 +410,7 @@ describe("wusd-token", () => {
       anchor.web3.SystemProgram.transfer({
         fromPubkey: localWallet.publicKey,
         toPubkey: delegate.publicKey,
-        lamports: anchor.web3.LAMPORTS_PER_SOL * 3
+        lamports: anchor.web3.LAMPORTS_PER_SOL * 10
       })
     );
     await provider.connection.sendTransaction(transferToDelegate, [localWallet]);
@@ -426,7 +426,7 @@ describe("wusd-token", () => {
       anchor.web3.SystemProgram.transfer({
         fromPubkey: localWallet.publicKey,
         toPubkey: transferRecipient.publicKey,
-        lamports: anchor.web3.LAMPORTS_PER_SOL * 3
+        lamports: anchor.web3.LAMPORTS_PER_SOL * 10
       })
     );
     await provider.connection.sendTransaction(transferToTransferRecipient, [localWallet]);
@@ -571,7 +571,7 @@ describe("wusd-token", () => {
       anchor.web3.SystemProgram.transfer({
         fromPubkey: localWallet.publicKey,
         toPubkey: burner.publicKey,
-        lamports: anchor.web3.LAMPORTS_PER_SOL * 3
+        lamports: anchor.web3.LAMPORTS_PER_SOL * 10
       })
     );
     await provider.connection.sendTransaction(transferToBurner, [localWallet]);
