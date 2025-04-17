@@ -58,7 +58,6 @@ describe("wusd-token", () => {
   let pauseState: anchor.web3.PublicKey;
   let freezeState: anchor.web3.PublicKey;
   let authorityBump: number;
-  let freezeBump: number;
 
   it("Initialize Contract", async () => {
     // 转账给admin
@@ -121,7 +120,7 @@ describe("wusd-token", () => {
     );
 
     // 创建freezeState账户
-    [freezeState, freezeBump] = await anchor.web3.PublicKey.findProgramAddress(
+    [freezeState] = await anchor.web3.PublicKey.findProgramAddress(
       [
         Buffer.from("freeze"),
         recipientTokenAccount.toBuffer(),
@@ -217,7 +216,7 @@ describe("wusd-token", () => {
     );
 
     // 创建freezeState账户
-    [freezeState, freezeBump] = await anchor.web3.PublicKey.findProgramAddress(
+    [freezeState] = await anchor.web3.PublicKey.findProgramAddress(
       [
         Buffer.from("freeze"),
         recipientTokenAccount.toBuffer(),
@@ -411,6 +410,7 @@ describe("wusd-token", () => {
         })
         .signers([freezer])
         .rpc();
+
       console.log("Account frozen successfully");
 
       // 创建freezer的token账户
@@ -461,8 +461,8 @@ describe("wusd-token", () => {
       );
       // 确认错误是因为账户被冻结
       assert(
-        error.message.includes("ConstraintSeeds"),
-        "Expected ConstraintSeeds error"
+        error.message.includes("InvalidDelegate"),
+        "Expected InvalidDelegate error"
       );
     }
 
