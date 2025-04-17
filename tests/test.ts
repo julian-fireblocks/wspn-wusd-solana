@@ -14,36 +14,36 @@ describe("wusd-token", () => {
 
   // 从deploy-keypair.json导入本地账号
   let localWallet: anchor.web3.Keypair;
-  
+
   before(async () => {
     // 从deploy-keypair.json文件中读取密钥
     const keypairData = require("../deploy-keypair.json");
     const localWalletBytes = new Uint8Array(keypairData);
     localWallet = anchor.web3.Keypair.fromSecretKey(localWalletBytes);
     console.log("Local wallet public key:", localWallet.publicKey.toBase58());
-    
+
     // 从本地账号转账SOL给minter和pauser账户
-    
+
     // 转账给minter
     const transferToMinter = new anchor.web3.Transaction().add(
       anchor.web3.SystemProgram.transfer({
         fromPubkey: localWallet.publicKey,
         toPubkey: minter.publicKey,
-        lamports: anchor.web3.LAMPORTS_PER_SOL * 10
+        lamports: anchor.web3.LAMPORTS_PER_SOL * 10,
       })
     );
     await provider.connection.sendTransaction(transferToMinter, [localWallet]);
-    
+
     // 转账给pauser
     const transferToPauser = new anchor.web3.Transaction().add(
       anchor.web3.SystemProgram.transfer({
         fromPubkey: localWallet.publicKey,
         toPubkey: pauser.publicKey,
-        lamports: anchor.web3.LAMPORTS_PER_SOL * 10
+        lamports: anchor.web3.LAMPORTS_PER_SOL * 10,
       })
     );
     await provider.connection.sendTransaction(transferToPauser, [localWallet]);
-    
+
     await new Promise((resolve) => setTimeout(resolve, 2000));
   });
   // 共享变量
@@ -58,21 +58,19 @@ describe("wusd-token", () => {
   let pauseState: anchor.web3.PublicKey;
   let freezeState: anchor.web3.PublicKey;
   let authorityBump: number;
-  let freezeBump: number; 
+  let freezeBump: number;
 
   it("Initialize Contract", async () => {
-    // 从本地账号转账SOL给管理员账户
-    
     // 转账给admin
     const transferToAdmin = new anchor.web3.Transaction().add(
       anchor.web3.SystemProgram.transfer({
         fromPubkey: localWallet.publicKey,
         toPubkey: admin.publicKey,
-        lamports: anchor.web3.LAMPORTS_PER_SOL * 10
+        lamports: anchor.web3.LAMPORTS_PER_SOL * 10,
       })
     );
     await provider.connection.sendTransaction(transferToAdmin, [localWallet]);
-    
+
     // 等待资金到账
     await new Promise((resolve) => setTimeout(resolve, 3000));
     console.log("Admin", admin.publicKey.toBase58());
@@ -92,7 +90,6 @@ describe("wusd-token", () => {
 
     // 等待token_mint账户初始化完成
     await new Promise((resolve) => setTimeout(resolve, 2000));
-
     // 创建authorityState账户
     [authorityState, authorityBump] =
       await anchor.web3.PublicKey.findProgramAddress(
@@ -200,10 +197,12 @@ describe("wusd-token", () => {
       anchor.web3.SystemProgram.transfer({
         fromPubkey: localWallet.publicKey,
         toPubkey: recipient.publicKey,
-        lamports: anchor.web3.LAMPORTS_PER_SOL * 10
+        lamports: anchor.web3.LAMPORTS_PER_SOL * 10,
       })
     );
-    await provider.connection.sendTransaction(transferToRecipient, [localWallet]);
+    await provider.connection.sendTransaction(transferToRecipient, [
+      localWallet,
+    ]);
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
     // 创建接收者的token账户
@@ -294,10 +293,12 @@ describe("wusd-token", () => {
       anchor.web3.SystemProgram.transfer({
         fromPubkey: localWallet.publicKey,
         toPubkey: transferRecipient.publicKey,
-        lamports: anchor.web3.LAMPORTS_PER_SOL * 10
+        lamports: anchor.web3.LAMPORTS_PER_SOL * 10,
       })
     );
-    await provider.connection.sendTransaction(transferToTransferRecipient, [localWallet]);
+    await provider.connection.sendTransaction(transferToTransferRecipient, [
+      localWallet,
+    ]);
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
     // 创建转账目标的token账户
@@ -310,6 +311,18 @@ describe("wusd-token", () => {
       { commitment: "confirmed" },
       TOKEN_2022_PROGRAM_ID
     );
+    // freezer 角色设置，用于测试冻结账户功能
+    const freezer = anchor.web3.Keypair.generate();
+    // 从本地账号转账SOL给freezer账户
+    const transferToFreezer = new anchor.web3.Transaction().add(
+      anchor.web3.SystemProgram.transfer({
+        fromPubkey: localWallet.publicKey,
+        toPubkey: freezer.publicKey,
+        lamports: anchor.web3.LAMPORTS_PER_SOL * 10,
+      })
+    );
+    await provider.connection.sendTransaction(transferToFreezer, [localWallet]);
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
     // 创建目标账户的freezeState
     const [transferFreezeState] =
@@ -337,6 +350,138 @@ describe("wusd-token", () => {
       })
       .signers([admin])
       .rpc();
+
+    // 设置admin为freezer角色
+    await program.methods
+      .setRole({ freezer: {} }, freezer.publicKey, true)
+      .accounts({
+        admin: admin.publicKey,
+        authorityState: authorityState,
+        tokenMint: tokenMint.publicKey,
+        pauseState: pauseState,
+      })
+      .signers([admin])
+      .rpc();
+    console.log("Admin set as freezer");
+
+    // 测试冻结账户功能
+    try {
+      // 尝试从冻结账户转账，应该失败
+      await program.methods
+        .transfer(transferAmount)
+        .accounts({
+          from: recipient.publicKey,
+          fromToken: recipientTokenAccount,
+          to: transferRecipient.publicKey,
+          toToken: transferRecipientTokenAccount,
+          tokenMint: tokenMint.publicKey,
+          authorityState: authorityState,
+          pauseState: pauseState,
+          fromFreezeState: freezeState,
+          toFreezeState: transferFreezeState,
+          tokenProgram: TOKEN_2022_PROGRAM_ID,
+        })
+        .signers([recipient])
+        .rpc();
+      let toTokenAccountInfo = await spl.getAccount(
+        provider.connection,
+        transferRecipientTokenAccount,
+        undefined,
+        TOKEN_2022_PROGRAM_ID
+      );
+
+      let toBalance = new anchor.BN(toTokenAccountInfo.amount.toString())
+        .div(new anchor.BN(10 ** decimals))
+        .toString();
+
+      console.log("Before recover To account balance:", toBalance, "WUSD");
+
+      // 冻结发送方账户
+      await program.methods
+        .freezeAccount()
+        .accounts({
+          authority: freezer.publicKey,
+          freezeState: transferFreezeState,
+          tokenAccount: transferRecipientTokenAccount,
+          authorityState: authorityState,
+          tokenMint: tokenMint.publicKey,
+          pauseState: pauseState,
+          tokenProgram: TOKEN_2022_PROGRAM_ID,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .signers([freezer])
+        .rpc();
+      console.log("Account frozen successfully");
+
+      // 创建freezer的token账户
+      const freezerTokenAccount = await spl.createAccount(
+        provider.connection,
+        freezer,
+        tokenMint.publicKey,
+        freezer.publicKey,
+        undefined,
+        { commitment: "confirmed" },
+        TOKEN_2022_PROGRAM_ID
+      );
+
+      await program.methods
+        .recoverFrozenAssets(transferAmount)
+        .accounts({
+          authority: freezer.publicKey,
+          freezeState: transferFreezeState,
+          frozenToken: transferRecipientTokenAccount,
+          freezerToken: freezerTokenAccount,
+          authorityState: authorityState,
+          tokenMint: tokenMint.publicKey,
+          pauseState: pauseState,
+          tokenProgram: TOKEN_2022_PROGRAM_ID,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .signers([freezer])
+        .rpc();
+
+      toTokenAccountInfo = await spl.getAccount(
+        provider.connection,
+        transferRecipientTokenAccount,
+        undefined,
+        TOKEN_2022_PROGRAM_ID
+      );
+
+      toBalance = new anchor.BN(toTokenAccountInfo.amount.toString())
+        .div(new anchor.BN(10 ** decimals))
+        .toString();
+
+      console.log("After recover To account balance:", toBalance, "WUSD");
+
+      assert(false, "Transfer should fail when account is frozen");
+    } catch (error) {
+      console.log(
+        "Transfer failed as expected when account is frozen:",
+        error.message
+      );
+      // 确认错误是因为账户被冻结
+      assert(
+        error.message.includes("ConstraintSeeds"),
+        "Expected ConstraintSeeds error"
+      );
+    }
+
+    // // 解冻账户
+    // await program.methods
+    //   .unfreezeAccount()
+    //   .accounts({
+    //     authority: freezer.publicKey,
+    //     freezeState: freezeState,
+    //     account: recipientTokenAccount,
+    //     authorityState: authorityState,
+    //     tokenMint: tokenMint.publicKey,
+    //     pauseState: pauseState,
+    //     tokenProgram: TOKEN_2022_PROGRAM_ID,
+    //     systemProgram: anchor.web3.SystemProgram.programId,
+    //   })
+    //   .signers([freezer])
+    //   .rpc();
+    // console.log("Account unfrozen successfully");
 
     console.log(
       "Attempting to transfer",
@@ -410,10 +555,12 @@ describe("wusd-token", () => {
       anchor.web3.SystemProgram.transfer({
         fromPubkey: localWallet.publicKey,
         toPubkey: delegate.publicKey,
-        lamports: anchor.web3.LAMPORTS_PER_SOL * 10
+        lamports: anchor.web3.LAMPORTS_PER_SOL * 10,
       })
     );
-    await provider.connection.sendTransaction(transferToDelegate, [localWallet]);
+    await provider.connection.sendTransaction(transferToDelegate, [
+      localWallet,
+    ]);
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
     // 创建转账目标账户
@@ -426,10 +573,12 @@ describe("wusd-token", () => {
       anchor.web3.SystemProgram.transfer({
         fromPubkey: localWallet.publicKey,
         toPubkey: transferRecipient.publicKey,
-        lamports: anchor.web3.LAMPORTS_PER_SOL * 10
+        lamports: anchor.web3.LAMPORTS_PER_SOL * 10,
       })
     );
-    await provider.connection.sendTransaction(transferToTransferRecipient, [localWallet]);
+    await provider.connection.sendTransaction(transferToTransferRecipient, [
+      localWallet,
+    ]);
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
     // 创建转账目标的token账户
@@ -571,11 +720,11 @@ describe("wusd-token", () => {
       anchor.web3.SystemProgram.transfer({
         fromPubkey: localWallet.publicKey,
         toPubkey: burner.publicKey,
-        lamports: anchor.web3.LAMPORTS_PER_SOL * 10
+        lamports: anchor.web3.LAMPORTS_PER_SOL * 10,
       })
     );
     await provider.connection.sendTransaction(transferToBurner, [localWallet]);
-    await new Promise((resolve) => setTimeout(resolve, 2000)); 
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
     // 创建burner的token账户
     const burnerTokenAccount = await spl.createAccount(
@@ -586,7 +735,7 @@ describe("wusd-token", () => {
       undefined,
       { commitment: "confirmed" },
       TOKEN_2022_PROGRAM_ID
-    ); 
+    );
 
     // 创建burner的freezeState
     const [burnerFreezeState] = await anchor.web3.PublicKey.findProgramAddress(
@@ -625,7 +774,7 @@ describe("wusd-token", () => {
       })
       .signers([admin])
       .rpc();
-    await new Promise((resolve) => setTimeout(resolve, 2000));   
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
     // 直接mint 100 WUSD到burner账户
     const mintAmount = new anchor.BN(100000000000); // 100 WUSD
