@@ -8,8 +8,7 @@ use instructions::mint::*;
 use instructions::burn::*;
 use instructions::transfer::*;
 use instructions::permit::*; 
-use instructions::pause::*;
-use instructions::recover::*;
+use instructions::pause::*; 
 use instructions::freeze::*;
 use anchor_lang::prelude::*;
 use anchor_spl::token_2022; 
@@ -180,12 +179,7 @@ pub mod wusd_token {
     /// 解冻账户
     pub fn unfreeze_account(ctx: Context<FreezeOperationAccounts>) -> Result<()> {
         instructions::freeze::handle_freeze_operation(ctx, FreezeOperation::Unfreeze)
-    }   
-
-    /// 从被冻结的账户中回收资产
-    pub fn recover_frozen_assets(ctx: Context<RecoverAssets>, amount: u64) -> Result<()> {
-        instructions::recover::recover_frozen_assets(ctx, amount)
-    } 
+    }    
 }
 
 #[derive(Accounts)]

@@ -20,7 +20,7 @@ describe("wusd-token", () => {
     const keypairData = require("../deploy-keypair.json");
     const localWalletBytes = new Uint8Array(keypairData);
     localWallet = anchor.web3.Keypair.fromSecretKey(localWalletBytes);
-    console.log("Local wallet public key:", localWallet.publicKey.toBase58());
+    console.log("Local wallet:", localWallet.publicKey.toBase58());
 
     // 从本地账号转账SOL给minter和pauser账户
 
@@ -348,146 +348,7 @@ describe("wusd-token", () => {
         systemProgram: anchor.web3.SystemProgram.programId,
       })
       .signers([admin])
-      .rpc();
-
-    // 设置admin为freezer角色
-    await program.methods
-      .setRole({ freezer: {} }, freezer.publicKey, true)
-      .accounts({
-        admin: admin.publicKey,
-        authorityState: authorityState,
-        tokenMint: tokenMint.publicKey,
-        pauseState: pauseState,
-      })
-      .signers([admin])
-      .rpc();
-    console.log("Admin set as freezer");
-
-    // 测试冻结账户功能
-    try {
-      // 尝试从冻结账户转账，应该失败
-      await program.methods
-        .transfer(transferAmount)
-        .accounts({
-          from: recipient.publicKey,
-          fromToken: recipientTokenAccount,
-          to: transferRecipient.publicKey,
-          toToken: transferRecipientTokenAccount,
-          tokenMint: tokenMint.publicKey,
-          authorityState: authorityState,
-          pauseState: pauseState,
-          fromFreezeState: freezeState,
-          toFreezeState: transferFreezeState,
-          tokenProgram: TOKEN_2022_PROGRAM_ID,
-        })
-        .signers([recipient])
-        .rpc();
-      let toTokenAccountInfo = await spl.getAccount(
-        provider.connection,
-        transferRecipientTokenAccount,
-        undefined,
-        TOKEN_2022_PROGRAM_ID
-      );
-
-      let toBalance = new anchor.BN(toTokenAccountInfo.amount.toString())
-        .div(new anchor.BN(10 ** decimals))
-        .toString();
-
-      console.log("Before recover To account balance:", toBalance, "WUSD");
-
-      // 冻结发送方账户
-      await program.methods
-        .freezeAccount()
-        .accounts({
-          authority: freezer.publicKey,
-          freezeState: transferFreezeState,
-          tokenAccount: transferRecipientTokenAccount,
-          authorityState: authorityState,
-          tokenMint: tokenMint.publicKey,
-          pauseState: pauseState,
-          tokenProgram: TOKEN_2022_PROGRAM_ID,
-          systemProgram: anchor.web3.SystemProgram.programId,
-        })
-        .signers([freezer])
-        .rpc();
-
-      console.log("Account frozen successfully");
-
-      // 创建freezer的token账户
-      const freezerTokenAccount = await spl.createAccount(
-        provider.connection,
-        freezer,
-        tokenMint.publicKey,
-        freezer.publicKey,
-        undefined,
-        { commitment: "confirmed" },
-        TOKEN_2022_PROGRAM_ID
-      );
-
-      await program.methods
-        .recoverFrozenAssets(transferAmount)
-        .accounts({
-          authority: freezer.publicKey,
-          freezeState: transferFreezeState,
-          frozenToken: transferRecipientTokenAccount,
-          freezerToken: freezerTokenAccount,
-          authorityState: authorityState,
-          tokenMint: tokenMint.publicKey,
-          pauseState: pauseState,
-          tokenProgram: TOKEN_2022_PROGRAM_ID,
-          systemProgram: anchor.web3.SystemProgram.programId,
-        })
-        .signers([freezer])
-        .rpc();
-
-      toTokenAccountInfo = await spl.getAccount(
-        provider.connection,
-        transferRecipientTokenAccount,
-        undefined,
-        TOKEN_2022_PROGRAM_ID
-      );
-
-      toBalance = new anchor.BN(toTokenAccountInfo.amount.toString())
-        .div(new anchor.BN(10 ** decimals))
-        .toString();
-
-      console.log("After recover To account balance:", toBalance, "WUSD");
-
-      assert(false, "Transfer should fail when account is frozen");
-    } catch (error) {
-      console.log(
-        "Transfer failed as expected when account is frozen:",
-        error.message
-      );
-      // 确认错误是因为账户被冻结
-      assert(
-        error.message.includes("InvalidDelegate"),
-        "Expected InvalidDelegate error"
-      );
-    }
-
-    // // 解冻账户
-    // await program.methods
-    //   .unfreezeAccount()
-    //   .accounts({
-    //     authority: freezer.publicKey,
-    //     freezeState: freezeState,
-    //     account: recipientTokenAccount,
-    //     authorityState: authorityState,
-    //     tokenMint: tokenMint.publicKey,
-    //     pauseState: pauseState,
-    //     tokenProgram: TOKEN_2022_PROGRAM_ID,
-    //     systemProgram: anchor.web3.SystemProgram.programId,
-    //   })
-    //   .signers([freezer])
-    //   .rpc();
-    // console.log("Account unfrozen successfully");
-
-    console.log(
-      "Attempting to transfer",
-      transferAmount.div(new anchor.BN(10 ** decimals)).toString(),
-      "WUSD"
-    );
+      .rpc(); 
 
     // 执行转账
     await program.methods
