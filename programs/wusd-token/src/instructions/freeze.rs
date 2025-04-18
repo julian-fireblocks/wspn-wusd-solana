@@ -1,8 +1,8 @@
 use crate::error::WusdError;
 use crate::state::{AuthorityState, FreezeState, PauseState};
 use anchor_lang::prelude::*;
-use anchor_spl::token_2022::{self, transfer_checked};
-use anchor_spl::token_interface::{Token2022, TokenAccount};
+use anchor_spl::token_2022::{self, freeze_account, thaw_account};
+use anchor_spl::token_interface::{Token2022, TokenAccount, Mint};
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub enum FreezeOperation {
@@ -18,81 +18,71 @@ pub fn handle_freeze_operation(
     ctx: Context<FreezeOperationAccounts>,
     operation: FreezeOperation,
 ) -> Result<()> {
+    let authority_state = &ctx.accounts.authority_state;
+    let token_mint = &ctx.accounts.token_mint;
+    
+    // 生成权限PDA签名
+    let mint_key = token_mint.key();
+    let seeds = &[
+        b"authority",
+        mint_key.as_ref(),
+        &[ctx.bumps.authority_state],
+    ];
+    
     match operation {
         FreezeOperation::Freeze => {
             // 验证账户未被冻结
-            require!(
-                !ctx.accounts.freeze_state.is_frozen,
-                WusdError::AccountAlreadyFrozen
-            );
+            require!(!ctx.accounts.freeze_state.is_frozen, WusdError::AccountAlreadyFrozen);
 
-            // 冻结账户
+            // 执行代币账户冻结
+            freeze_account(
+                CpiContext::new_with_signer(
+                    ctx.accounts.token_program.to_account_info(),
+                    token_2022::FreezeAccount {
+                        account: ctx.accounts.token_account.to_account_info(),
+                        mint: token_mint.to_account_info(),
+                        authority: authority_state.to_account_info(),
+                    },
+                    &[seeds],
+                ),
+            )?;
+
+            // 更新冻结状态
             ctx.accounts.freeze_state.freeze();
 
-            // 发出冻结事件
             emit!(FreezeAccountEvent {
                 authority: ctx.accounts.authority.key(),
-                freeze_state: ctx.accounts.freeze_state.key(),
+                token_account: ctx.accounts.token_account.key(),
                 timestamp: Clock::get()?.unix_timestamp,
             });
         }
         FreezeOperation::Unfreeze => {
             // 验证账户已被冻结
-            require!(
-                ctx.accounts.freeze_state.is_frozen,
-                WusdError::AccountNotFrozen
-            );
+            require!(ctx.accounts.freeze_state.is_frozen, WusdError::AccountNotFrozen);
 
-            // 解冻账户
+            // 解冻代币账户
+            thaw_account(
+                CpiContext::new_with_signer(
+                    ctx.accounts.token_program.to_account_info(),
+                    token_2022::ThawAccount {
+                        account: ctx.accounts.token_account.to_account_info(),
+                        mint: token_mint.to_account_info(),
+                        authority: authority_state.to_account_info(),
+                    },
+                    &[seeds],
+                ),
+            )?;
+
+            // 更新冻结状态
             ctx.accounts.freeze_state.unfreeze();
 
-            // 发出解冻事件
             emit!(UnfreezeAccountEvent {
                 authority: ctx.accounts.authority.key(),
-                freeze_state: ctx.accounts.freeze_state.key(),
+                token_account: ctx.accounts.token_account.key(),
                 timestamp: Clock::get()?.unix_timestamp,
             });
         }
     }
-
-    Ok(())
-}
-
-/// 从被冻结的账户中回收资产
-pub fn recover_frozen_assets(ctx: Context<RecoverFrozenAssets>, amount: u64) -> Result<()> {
-    // 验证账户已被冻结
-    require!(
-        ctx.accounts.freeze_state.is_frozen,
-        WusdError::AccountNotFrozen
-    );
-
-    // 验证金额大于0
-    require!(amount > 0, WusdError::InvalidAmount);
-
-    // 执行转账
-    transfer_checked(
-        CpiContext::new(
-            ctx.accounts.token_program.to_account_info(),
-            token_2022::TransferChecked {
-                from: ctx.accounts.frozen_token.to_account_info(),
-                mint: ctx.accounts.token_mint.to_account_info(),
-                to: ctx.accounts.freezer_token.to_account_info(),
-                authority: ctx.accounts.authority.to_account_info(),
-            },
-        ),
-        amount,
-        ctx.accounts.token_mint.decimals,
-    )?;
-
-    // 发出资产回收事件
-    emit!(RecoverFrozenAssetsEvent {
-        authority: ctx.accounts.authority.key(),
-        frozen_account: ctx.accounts.frozen_token.key(),
-        freezer_account: ctx.accounts.freezer_token.key(),
-        amount,
-        timestamp: Clock::get()?.unix_timestamp,
-    });
-
     Ok(())
 }
 
@@ -130,99 +120,51 @@ pub struct InitializeFreezeState<'info> {
 pub struct FreezeOperationAccounts<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
-
+    
     #[account(
         init_if_needed,
         payer = authority,
         space = FreezeState::SIZE,
-        seeds = [b"freeze", account.key().as_ref(), token_mint.key().as_ref()],
+        seeds = [b"freeze", token_account.key().as_ref(), token_mint.key().as_ref()],
         bump
     )]
     pub freeze_state: Account<'info, FreezeState>,
-
-    /// CHECK: 这个账户仅用于生成PDA种子
-    #[account(
-        constraint = account.owner == &token_program.key() @ WusdError::InvalidOwner
-    )]
-    pub account: AccountInfo<'info>,
-
-    #[account(
-        constraint = authority_state.is_freezer(authority.key()) @ WusdError::Unauthorized,
-        seeds = [b"authority", token_mint.key().as_ref()],
-        bump
-    )]
-    pub authority_state: Account<'info, AuthorityState>,
-
-    pub token_mint: InterfaceAccount<'info, anchor_spl::token_interface::Mint>,
-    #[account(
-        seeds = [b"pause_state", token_mint.key().as_ref()],
-        bump,
-        constraint = !pause_state.paused @ WusdError::ContractPaused
-    )]
-    pub pause_state: Account<'info, PauseState>,
-    pub token_program: Program<'info, Token2022>,
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-pub struct RecoverFrozenAssets<'info> {
+    
     #[account(mut)]
-    pub authority: Signer<'info>,
-
+    pub token_account: InterfaceAccount<'info, TokenAccount>,
+    
     #[account(
-        mut,
-        seeds = [b"freeze", frozen_token.key().as_ref(), token_mint.key().as_ref()],
+        seeds = [b"authority", token_mint.key().as_ref()],
         bump,
-        constraint = freeze_state.is_frozen @ WusdError::AccountNotFrozen
-    )]
-    pub freeze_state: Account<'info, FreezeState>,
-
-    #[account(
-        mut,
         constraint = authority_state.is_freezer(authority.key()) @ WusdError::Unauthorized
     )]
-    pub frozen_token: InterfaceAccount<'info, TokenAccount>,
-
-    #[account(mut)]
-    pub freezer_token: InterfaceAccount<'info, TokenAccount>,
-
-    #[account(
-        constraint = authority_state.is_freezer(authority.key()) @ WusdError::Unauthorized,
-        seeds = [b"authority", token_mint.key().as_ref()],
-        bump
-    )]
     pub authority_state: Account<'info, AuthorityState>,
-
-    pub token_mint: InterfaceAccount<'info, anchor_spl::token_interface::Mint>,
+    
+    pub token_mint: InterfaceAccount<'info, Mint>,
+    
     #[account(
         seeds = [b"pause_state", token_mint.key().as_ref()],
         bump,
         constraint = !pause_state.paused @ WusdError::ContractPaused
     )]
     pub pause_state: Account<'info, PauseState>,
+    
     pub token_program: Program<'info, Token2022>,
     pub system_program: Program<'info, System>,
-}
+} 
 
 #[event]
 pub struct FreezeAccountEvent {
     pub authority: Pubkey,
-    pub freeze_state: Pubkey,
+    pub token_account: Pubkey,
     pub timestamp: i64,
 }
 
 #[event]
 pub struct UnfreezeAccountEvent {
     pub authority: Pubkey,
-    pub freeze_state: Pubkey,
+    pub token_account: Pubkey,
     pub timestamp: i64,
 }
 
-#[event]
-pub struct RecoverFrozenAssetsEvent {
-    pub authority: Pubkey,
-    pub frozen_account: Pubkey,
-    pub freezer_account: Pubkey,
-    pub amount: u64,
-    pub timestamp: i64,
-}
+

@@ -4,4 +4,4 @@ pub mod freeze;
 pub mod mint;
 pub mod pause;
 pub mod permit;
-pub mod transfer;
+pub mod transfer; 

@@ -2,17 +2,17 @@
 anchor_version = "0.29.0"
 
 [features]
-resolution = true
+seeds = false
 skip-lint = false
 
 [programs.devnet]
-wusd_token = "4xPf5n8CbNUm8AT5DVgdWaPT3nVTPKU9oGjreiGBK3fB"
+wusd_token = "3NDAD3Duff9rftUo2amTjTtf2KMGpxHvn7qZ5cz9p97Q"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "https://api.devnet.solana.com"
+cluster = "http://localhost:8899"
 wallet = "./deploy-keypair.json"
 
 [workspace]
@@ -27,6 +27,6 @@ shutdown_wait = 2000
 upgradeable = true
 
 [test.validator]
-bind_address = "https://api.devnet.solana.com"
+bind_address = "localhost"
 ledger = ".anchor/test-ledger"
 rpc_port = 8899

@@ -8,15 +8,15 @@ use instructions::mint::*;
 use instructions::burn::*;
 use instructions::transfer::*;
 use instructions::permit::*; 
-use instructions::pause::*;
+use instructions::pause::*; 
 use instructions::freeze::*;
 use anchor_lang::prelude::*;
 use anchor_spl::token_2022; 
 use anchor_spl::token_interface::Mint;
-use spl_token_2022::instruction::AuthorityType;    
+use spl_token_2022::instruction::AuthorityType;
 use state::{AuthorityState, MintState, PauseState}; 
 
-declare_id!("4xPf5n8CbNUm8AT5DVgdWaPT3nVTPKU9oGjreiGBK3fB");
+declare_id!("3NDAD3Duff9rftUo2amTjTtf2KMGpxHvn7qZ5cz9p97Q");
 
 // 辅助函数：初始化状态账户，减少栈使用
 #[inline(always)]
@@ -179,12 +179,7 @@ pub mod wusd_token {
     /// 解冻账户
     pub fn unfreeze_account(ctx: Context<FreezeOperationAccounts>) -> Result<()> {
         instructions::freeze::handle_freeze_operation(ctx, FreezeOperation::Unfreeze)
-    }   
-
-    /// 从被冻结的账户中回收资产
-    pub fn recover_frozen_assets(ctx: Context<RecoverFrozenAssets>, amount: u64) -> Result<()> {
-        instructions::freeze::recover_frozen_assets(ctx, amount)
-    } 
+    }    
 }
 
 #[derive(Accounts)]
@@ -197,13 +192,13 @@ pub struct Initialize<'info> {
 
     /// 铸币者账户
     /// CHECK: 此账户仅用于验证签名，不直接读取或写入数据
-    pub minter: AccountInfo<'info>,
+    pub minter: UncheckedAccount<'info>,
 
     /// 暂停者账户
     /// CHECK: 此账户仅用于验证签名，不直接读取或写入数据
-    pub pauser: AccountInfo<'info>,
+    pub pauser: UncheckedAccount<'info>,
 
-    /// 权限管理账户 - 极简化约束条件
+    /// 权限管理账户 
     #[account(
         init,
         payer = authority, 
@@ -217,7 +212,8 @@ pub struct Initialize<'info> {
     #[account(
         mut,
         mint::authority = authority.key(),
-        constraint = token_mint.decimals == decimals
+        constraint = token_mint.decimals == decimals,
+        constraint = token_mint.is_initialized @ ProgramError::UninitializedAccount
     )]
     pub token_mint: InterfaceAccount<'info, Mint>,
     
@@ -240,7 +236,7 @@ pub struct Initialize<'info> {
         bump
     )]
     pub pause_state: Account<'info, PauseState>,
-    pub system_program: Program<'info, System>,     
+    pub system_program: Program<'info, System>,  
     pub token_program: Program<'info, anchor_spl::token_2022::Token2022>,
     pub rent: Sysvar<'info, Rent>,
 }
