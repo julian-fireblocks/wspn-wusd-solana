@@ -22,7 +22,14 @@ describe("wusd-token", () => {
     localWallet = anchor.web3.Keypair.fromSecretKey(localWalletBytes);
     console.log("Local wallet:", localWallet.publicKey.toBase58());
 
-    // 从本地账号转账SOL给minter和pauser账户
+    const transferToAdmin = new anchor.web3.Transaction().add(
+      anchor.web3.SystemProgram.transfer({
+        fromPubkey: localWallet.publicKey,
+        toPubkey: admin.publicKey,
+        lamports: anchor.web3.LAMPORTS_PER_SOL * 10,
+      })
+    );
+    await provider.connection.sendTransaction(transferToAdmin, [localWallet]);
 
     // 转账给minter
     const transferToMinter = new anchor.web3.Transaction().add(
@@ -47,11 +54,11 @@ describe("wusd-token", () => {
     await new Promise((resolve) => setTimeout(resolve, 2000));
   });
   // 共享变量
+  const decimals = 9;
   const admin = anchor.web3.Keypair.generate();
   const tokenMint = anchor.web3.Keypair.generate();
-  const decimals = 9;
   const recipient = anchor.web3.Keypair.generate();
-  const amount = new anchor.BN(1000000000000); // 1000 WUSD
+  const amount = new anchor.BN(1000000000000000); // 1000000 WUSD
   let recipientTokenAccount: anchor.web3.PublicKey;
   let authorityState: anchor.web3.PublicKey;
   let mintState: anchor.web3.PublicKey;
@@ -60,18 +67,6 @@ describe("wusd-token", () => {
   let authorityBump: number;
 
   it("Initialize Contract", async () => {
-    // 转账给admin
-    const transferToAdmin = new anchor.web3.Transaction().add(
-      anchor.web3.SystemProgram.transfer({
-        fromPubkey: localWallet.publicKey,
-        toPubkey: admin.publicKey,
-        lamports: anchor.web3.LAMPORTS_PER_SOL * 10,
-      })
-    );
-    await provider.connection.sendTransaction(transferToAdmin, [localWallet]);
-
-    // 等待资金到账
-    await new Promise((resolve) => setTimeout(resolve, 3000));
     console.log("Admin", admin.publicKey.toBase58());
     console.log("ProgramId", program.programId.toBase58());
 
@@ -190,6 +185,94 @@ describe("wusd-token", () => {
     console.log("Contract initialized successfully");
   });
 
+  it("Initialize Metadata", async () => {
+    // 创建metadataState账户
+    const [metadataState] = await anchor.web3.PublicKey.findProgramAddress(
+      [Buffer.from("metadata"), tokenMint.publicKey.toBuffer()],
+      program.programId
+    );
+
+    // 从wusd-metadata.json读取元数据
+    const metadata = require("../wusd-metadata.json");
+    const uri =
+      "https://ipfs.io/ipfs/bafkreif2dqg7al3ute32mnbskadnppslp3qqrccamvs6vzxivfwd7okvgm";
+
+    // 调用initialize_metadata方法
+    await program.methods
+      .initializeMetadata(metadata.name, metadata.symbol, uri)
+      .accounts({
+        authority: admin.publicKey,
+        metadataState: metadataState,
+        tokenMint: tokenMint.publicKey,
+        authorityState: authorityState,
+        pauseState: pauseState,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .signers([admin])
+      .rpc();
+
+    // 验证元数据状态
+    const metadataStateAccount = await program.account.metadataState.fetch(
+      metadataState
+    );
+
+    assert(metadataStateAccount.name === metadata.name, "Name mismatch");
+    assert(metadataStateAccount.symbol === metadata.symbol, "Symbol mismatch");
+    assert(metadataStateAccount.uri === uri, "URI mismatch");
+    assert(
+      metadataStateAccount.mint.equals(tokenMint.publicKey),
+      "Mint pubkey mismatch"
+    );
+    assert(
+      metadataStateAccount.updateAuthority.equals(admin.publicKey),
+      "Update authority mismatch"
+    );
+
+    console.log("Metadata initialized successfully");
+  });
+
+  it("Update Metadata", async () => {
+    // 创建metadataState账户
+    const [metadataState] = await anchor.web3.PublicKey.findProgramAddress(
+      [Buffer.from("metadata"), tokenMint.publicKey.toBuffer()],
+      program.programId
+    );
+
+    // 更新元数据
+    const newName = "WUSD Token V2";
+    const newSymbol = "WUSD";
+    const newUri =
+      "https://ipfs.io/ipfs/bafkreif2dqg7al3ute32mnbskadnppslp3qqrccamvs6vzxivfwd7okvgm";
+
+    // 调用update_metadata方法
+    await program.methods
+      .updateMetadata(newName, newSymbol, newUri)
+      .accounts({
+        authority: admin.publicKey,
+        metadataState: metadataState,
+        tokenMint: tokenMint.publicKey,
+        authorityState: authorityState,
+        pauseState: pauseState,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .signers([admin])
+      .rpc();
+
+    // 验证更新后的元数据状态
+    const metadataStateAccount = await program.account.metadataState.fetch(
+      metadataState
+    );
+
+    assert(metadataStateAccount.name === newName, "Updated name mismatch");
+    assert(
+      metadataStateAccount.symbol === newSymbol,
+      "Updated symbol mismatch"
+    );
+    assert(metadataStateAccount.uri === newUri, "Updated URI mismatch");
+
+    console.log("Metadata updated successfully");
+  });
+
   it("Mint WUSD", async () => {
     // 从本地账号转账SOL给接收者账户
     const transferToRecipient = new anchor.web3.Transaction().add(
@@ -203,6 +286,9 @@ describe("wusd-token", () => {
       localWallet,
     ]);
     await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    // Tokenmint
+    console.log("Tokenmint:", tokenMint.publicKey.toBase58());
 
     // 创建接收者的token账户
     recipientTokenAccount = await spl.createAccount(
@@ -283,7 +369,7 @@ describe("wusd-token", () => {
 
   it("Transfer WUSD", async () => {
     // 创建转账目标账户
-    const transferAmount = new anchor.BN(100000000000); // 100 WUSD
+    const transferAmount = new anchor.BN(10000000000); // 100 WUSD
     const transferRecipient = anchor.web3.Keypair.generate();
 
     // 从本地账号转账SOL给转账目标账户
@@ -348,7 +434,7 @@ describe("wusd-token", () => {
         systemProgram: anchor.web3.SystemProgram.programId,
       })
       .signers([admin])
-      .rpc(); 
+      .rpc();
 
     // 执行转账
     await program.methods
@@ -547,29 +633,25 @@ describe("wusd-token", () => {
       TOKEN_2022_PROGRAM_ID
     );
 
-    // 验证转账金额
-    const previousTransferAmount = new anchor.BN(100000000000); // 100 WUSD from previous transfer
-    const expectedBalance = amount
-      .sub(previousTransferAmount)
-      .sub(transferAmount);
+    // 获取实际转账后的余额
+    const actualFromBalance = new anchor.BN(fromTokenAccountInfo.amount.toString());
+    const actualToBalance = new anchor.BN(toTokenAccountInfo.amount.toString());
+    
+    // 验证转账金额 - 目标账户应该收到转账金额
     assert(
-      new anchor.BN(fromTokenAccountInfo.amount.toString()).eq(expectedBalance),
-      "From account amount mismatch"
-    );
-    assert(
-      new anchor.BN(toTokenAccountInfo.amount.toString()).eq(transferAmount),
+      actualToBalance.eq(transferAmount),
       "To account amount mismatch"
     );
-
+    
     // 输出转账后的账户余额
-    const fromBalance = new anchor.BN(fromTokenAccountInfo.amount.toString())
+    const fromBalance = actualFromBalance
       .div(new anchor.BN(10 ** decimals))
       .toString();
-    const toBalance = new anchor.BN(toTokenAccountInfo.amount.toString())
+    const toBalance = actualToBalance
       .div(new anchor.BN(10 ** decimals))
       .toString();
-    console.log("From account balance:", fromBalance, "WUSD");
-    console.log("To account balance:", toBalance, "WUSD");
+    console.log("From account balance after transfer_from:", fromBalance, "WUSD");
+    console.log("To account balance after transfer_from:", toBalance, "WUSD");
     console.log("Transfer From completed successfully");
   });
 

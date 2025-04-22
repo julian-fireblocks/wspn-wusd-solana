@@ -50,8 +50,7 @@ impl PermitState {
             expiration,
             bump,
         }
-    } 
-
+    }
 }
 
 /// 权限管理状态账户，存储合约的权限配置
@@ -202,7 +201,7 @@ impl PauseState {
     pub const SIZE: usize = 8 + 1; // paused     /// 设置暂停状态
     pub fn set_paused(&mut self, paused: bool) {
         self.paused = paused;
-    } 
+    }
 }
 
 /// 账户冻结状态，用于控制账户的冻结/解冻
@@ -213,8 +212,8 @@ pub struct FreezeState {
 }
 
 impl FreezeState {
-    pub const SIZE: usize = 8 + 1; // is_frozen 
-        /// 冻结账户
+    pub const SIZE: usize = 8 + 1; // is_frozen
+    /// 冻结账户
     pub fn freeze(&mut self) {
         self.is_frozen = true;
     }
@@ -222,5 +221,44 @@ impl FreezeState {
     /// 解冻账户
     pub fn unfreeze(&mut self) {
         self.is_frozen = false;
+    }
+}
+
+#[account]
+#[derive(Default)]
+pub struct MetadataState {
+    pub name: String,             // 代币名称
+    pub symbol: String,           // 代币符号
+    pub uri: String,              // 元数据URI
+    pub mint: Pubkey,             // 关联的代币铸币账户
+    pub update_authority: Pubkey, // 更新权限
+    pub bump: u8,                 // PDA的bump值
+}
+
+impl MetadataState {
+    pub const SIZE: usize = 8 + // 判别器
+                           32 + // 名称 (最大长度)
+                           10 + // 符号 (最大长度)
+                           200 + // URI (最大长度)
+                           32 + // mint
+                           32 + // update_authority
+                           1; // bump
+
+    pub fn initialize(name: String, symbol: String,uri: String,mint: Pubkey,update_authority: Pubkey,bump: u8,) -> Self {
+        Self {
+            name,
+            symbol,
+            uri,
+            mint,
+            update_authority,
+            bump,
+        }
+    }
+
+    pub fn update(&mut self, name: String, symbol: String, uri: String) -> Result<()> {
+        self.name = name;
+        self.symbol = symbol;
+        self.uri = uri;
+        Ok(())
     }
 }
