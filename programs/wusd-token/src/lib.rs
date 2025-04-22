@@ -9,8 +9,7 @@ use instructions::burn::*;
 use instructions::transfer::*;
 use instructions::permit::*; 
 use instructions::pause::*; 
-use instructions::freeze::*;
-use instructions::metadata::*;  
+use instructions::freeze::*;  
 use anchor_lang::prelude::*;
 use anchor_spl::token_2022; 
 use anchor_spl::token_interface::Mint;
@@ -121,16 +120,6 @@ pub mod wusd_token {
     /// 初始化冻结状态账户
     pub fn initialize_freeze_state(ctx: Context<InitializeFreezeState>) -> Result<()> {
         instructions::freeze::initialize_freeze_state(ctx)
-    }
-
-    /// 初始化代币元数据
-    pub fn initialize_metadata(ctx: Context<InitializeMetadata>,name: String,symbol: String,uri: String,) -> Result<()> {
-        instructions::metadata::initialize_metadata(ctx, name, symbol, uri)
-    }
-    
-    /// 更新代币元数据
-    pub fn update_metadata(ctx: Context<UpdateMetadata>,name: String,symbol: String,uri: String,) -> Result<()> {
-     instructions::metadata::update_metadata(ctx, name, symbol, uri)
     } 
 
     /// 转移管理员权限
