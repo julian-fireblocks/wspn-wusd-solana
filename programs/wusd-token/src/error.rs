@@ -43,11 +43,7 @@ pub enum WusdError {
     #[msg("Expired permit")]
     ExpiredPermit,
     #[msg("Invalid address")]
-    InvalidAddress,
-    #[msg("Invalid name")]
-    InvalidName,
-    #[msg("Invalid symbol")]
-    InvalidSymbol,
+    InvalidAddress, 
     #[msg("Invalid permit")]
     InvalidPermit,
     #[msg("Invalid signature")]
