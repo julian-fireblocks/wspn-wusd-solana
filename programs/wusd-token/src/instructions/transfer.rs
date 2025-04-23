@@ -1,5 +1,5 @@
 use crate::error::WusdError;
-use crate::state::{AuthorityState, FreezeState, MintState, PauseState, PermitState};
+use crate::state::{AuthorityState, FreezeState, MintState, PauseState, ApproveState};
 use anchor_lang::prelude::*;
 use anchor_spl::token_2022::{self, transfer_checked, Token2022};
 use anchor_spl::token_interface::TokenAccount;
@@ -43,11 +43,11 @@ pub fn transfer_from(ctx: Context<TransferFrom>, amount: u64) -> Result<()> {
     // 验证授权有效性
     let current_time = Clock::get()?.unix_timestamp;
     require!(
-        ctx.accounts.permit.expiration > current_time,
-        WusdError::ExpiredPermit
+        ctx.accounts.approve.expiration > current_time,
+        WusdError::ExpiredApprovet
     );
     require!(
-        ctx.accounts.permit.amount >= amount,
+        ctx.accounts.approve.amount >= amount,
         WusdError::InsufficientAllowance
     );
 
@@ -70,9 +70,9 @@ pub fn transfer_from(ctx: Context<TransferFrom>, amount: u64) -> Result<()> {
     )?;
 
     // 更新授权额度
-    ctx.accounts.permit.amount = ctx
+    ctx.accounts.approve.amount = ctx
         .accounts
-        .permit
+        .approve
         .amount
         .checked_sub(amount)
         .ok_or(WusdError::InsufficientAllowance)?;
@@ -106,15 +106,15 @@ pub struct TransferFrom<'info> {
     pub to_token: InterfaceAccount<'info, anchor_spl::token_interface::TokenAccount>,
     #[account(
         seeds = [
-            b"permit",
+            b"approve",
             owner.key().as_ref(),
             spender.key().as_ref()
         ],
-        bump = permit.bump,
+        bump = approve.bump,
         has_one = owner,
         has_one = spender,
     )]
-    pub permit: Account<'info, PermitState>,
+    pub approve: Account<'info, ApproveState>,
     pub mint_state: Box<Account<'info, MintState>>,
     #[account(
         seeds = [b"pause_state", token_mint.key().as_ref()],

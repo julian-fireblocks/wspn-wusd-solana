@@ -14,7 +14,7 @@ pub struct AllowanceState {
 
 /// 签名许可状态账户，用于EIP-2612兼容的签名授权
 #[account]
-pub struct PermitState {
+pub struct ApproveState {
     /// 所有者地址
     pub owner: Pubkey,
     /// 被授权者地址
@@ -29,7 +29,7 @@ pub struct PermitState {
     pub bump: u8,
 }
 
-impl PermitState {
+impl ApproveState {
     /// 许可状态账户大小
     pub const SIZE: usize = 8 + 32 + 32 + 8 + 8 + 8 + 1;
 
@@ -50,8 +50,7 @@ impl PermitState {
             expiration,
             bump,
         }
-    } 
-
+    }
 }
 
 /// 权限管理状态账户，存储合约的权限配置
@@ -202,7 +201,7 @@ impl PauseState {
     pub const SIZE: usize = 8 + 1; // paused     /// 设置暂停状态
     pub fn set_paused(&mut self, paused: bool) {
         self.paused = paused;
-    } 
+    }
 }
 
 /// 账户冻结状态，用于控制账户的冻结/解冻
@@ -213,8 +212,8 @@ pub struct FreezeState {
 }
 
 impl FreezeState {
-    pub const SIZE: usize = 8 + 1; // is_frozen 
-        /// 冻结账户
+    pub const SIZE: usize = 8 + 1; // is_frozen
+    /// 冻结账户
     pub fn freeze(&mut self) {
         self.is_frozen = true;
     }

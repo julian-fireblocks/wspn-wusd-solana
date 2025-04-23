@@ -7,16 +7,16 @@ use instructions::roles::*;
 use instructions::mint::*; 
 use instructions::burn::*;
 use instructions::transfer::*;
-use instructions::permit::*; 
+use instructions::approve::*; 
 use instructions::pause::*; 
-use instructions::freeze::*;
+use instructions::freeze::*;  
 use anchor_lang::prelude::*;
 use anchor_spl::token_2022; 
 use anchor_spl::token_interface::Mint;
 use spl_token_2022::instruction::AuthorityType;
 use state::{AuthorityState, MintState, PauseState}; 
 
-declare_id!("3NDAD3Duff9rftUo2amTjTtf2KMGpxHvn7qZ5cz9p97Q");
+declare_id!("F8bssPyuN6H4HoJtWRW4koomPiLnr8hgAeQaQW9yiRER");
 
 // 辅助函数：初始化状态账户，减少栈使用
 #[inline(always)]
@@ -120,7 +120,7 @@ pub mod wusd_token {
     /// 初始化冻结状态账户
     pub fn initialize_freeze_state(ctx: Context<InitializeFreezeState>) -> Result<()> {
         instructions::freeze::initialize_freeze_state(ctx)
-    }
+    } 
 
     /// 转移管理员权限
     pub fn transfer_admin(ctx: Context<TransferAdmin>, new_admin: Pubkey) -> Result<()> {
@@ -144,7 +144,7 @@ pub mod wusd_token {
     
     /// 处理代表津贴请求，允许代币持有者授权其他账户使用其代币 
     pub fn approve(ctx: Context<Approve>, amount: u64, expiry_time: i64) -> Result<()> { 
-        instructions::permit::approve_set(ctx, amount, expiry_time) 
+        instructions::approve::approve_set(ctx, amount, expiry_time) 
     }
 
     /// 转账WUSD代币 
@@ -179,7 +179,7 @@ pub mod wusd_token {
     /// 解冻账户
     pub fn unfreeze_account(ctx: Context<FreezeOperationAccounts>) -> Result<()> {
         instructions::freeze::handle_freeze_operation(ctx, FreezeOperation::Unfreeze)
-    }    
+    }   
 }
 
 #[derive(Accounts)]
@@ -247,3 +247,4 @@ pub struct InitializeEvent {
     pub mint: Pubkey,
     pub decimals: u8,
 }
+
