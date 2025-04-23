@@ -86,15 +86,15 @@ pub fn set_token_metadata(
     ];
     let signer_seeds = &[&seeds[..]];
 
-    // 注意：invoke_signed 的 accounts 参数需要匹配 instruction 定义的顺序和类型 
     let account_infos = vec![
         ctx.accounts.metadata.to_account_info(),
         ctx.accounts.mint.to_account_info(),
-        ctx.accounts.authority_state.to_account_info(),
+        ctx.accounts.authority_state.to_account_info(), // Mint Authority
         ctx.accounts.payer.to_account_info(),
+        ctx.accounts.authority_state.to_account_info(), // Update Authority
         ctx.accounts.system_program.to_account_info(),
-        ctx.accounts.rent.to_account_info(), 
-        ctx.accounts.token_metadata_program.to_account_info(), 
+        ctx.accounts.rent.to_account_info(),
+        ctx.accounts.token_metadata_program.to_account_info(),
     ];
 
     invoke_signed(&create_metadata_ix, &account_infos, signer_seeds)?;
@@ -182,9 +182,17 @@ pub struct SetTokenMetadata<'info> {
         bump, 
         constraint = authority_state.is_minter(authority.key()) @ WusdError::Unauthorized // 假设 is_minter 检查调用者权限
     )]
-    pub authority_state: Account<'info, AuthorityState>,
-    /// CHECK: Metaplex Metadata PDA - 需要初始化或传入正确的 PDA 地址
-    #[account(mut)]
+    pub authority_state: Account<'info, AuthorityState>, 
+    /// CHECK: metadata
+    #[account(
+        seeds = [
+            b"metadata",
+            token_metadata_program.key().as_ref(),
+            mint.key().as_ref()
+        ],
+        bump,
+        seeds::program = token_metadata_program.key()
+    )]
     pub metadata: UncheckedAccount<'info>,
     #[account(mut)]
     pub mint: InterfaceAccount<'info, anchor_spl::token_interface::Mint>,

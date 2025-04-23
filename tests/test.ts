@@ -383,7 +383,7 @@ describe("wusd-token", () => {
     // 获取元数据账户信息
     await provider.connection.confirmTransaction(tx, "confirmed");
     const metadataAccount = await provider.connection.getAccountInfo(
-      TOKEN_METADATA_PROGRAM_ID
+      metadataPda
     );
     assert(metadataAccount !== null, "Metadata account not created");
     assert(
