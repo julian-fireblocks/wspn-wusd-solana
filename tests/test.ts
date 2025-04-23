@@ -2,8 +2,9 @@ import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { WusdToken } from "../target/types/wusd_token";
 import * as spl from "@solana/spl-token";
-import { TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
+import { TOKEN_2022_PROGRAM_ID } from "@solana/spl-token"; 
 import { assert } from "chai";
+import { MPL_TOKEN_METADATA_PROGRAM_ID } from "@metaplex-foundation/mpl-token-metadata";
 
 describe("wusd-token", () => {
   const provider = anchor.AnchorProvider.env();
@@ -22,11 +23,12 @@ describe("wusd-token", () => {
   let localWallet: anchor.web3.Keypair;
   // 转账金额
   const trans_lamports = anchor.web3.LAMPORTS_PER_SOL * 10;
+  const TOKEN_METADATA_PROGRAM_ID = new anchor.web3.PublicKey(MPL_TOKEN_METADATA_PROGRAM_ID);
 
   before(async () => {
     // 从deploy-keypair.json文件中读取密钥
     const keypairData = require("../deploy-keypair.json");
-    const localWalletBytes = new Uint8Array(keypairData);
+    const localWalletBytes = new Uint8Array(keypairData); 
     localWallet = anchor.web3.Keypair.fromSecretKey(localWalletBytes);
     console.log("Local wallet:", localWallet.publicKey.toBase58());
 
@@ -142,6 +144,7 @@ describe("wusd-token", () => {
   let pauseState: anchor.web3.PublicKey;
   let freezeState: anchor.web3.PublicKey;
   let authorityBump: number;
+  let metadataPda: anchor.web3.PublicKey;
 
   it("Initialize Contract", async () => {
     console.log("Admin", admin.publicKey.toBase58());
@@ -161,6 +164,15 @@ describe("wusd-token", () => {
 
     // 等待token_mint账户初始化完成
     await new Promise((resolve) => setTimeout(resolve, 2000));
+    [metadataPda] = await anchor.web3.PublicKey.findProgramAddress(
+      [
+        Buffer.from("metadata"),
+        TOKEN_METADATA_PROGRAM_ID.toBuffer(),
+        tokenMint.publicKey.toBuffer(),
+      ],
+      TOKEN_METADATA_PROGRAM_ID
+    );
+
     // 创建authorityState账户
     [authorityState, authorityBump] =
       await anchor.web3.PublicKey.findProgramAddress(
@@ -341,6 +353,45 @@ describe("wusd-token", () => {
     console.log("Successfully minted", mintedWUSD, "WUSD to recipient");
 
     assert(mintedAmount.eq(amount), "Amount mismatch");
+  });
+
+  it("Set Token Metadata", async () => {
+    const metadata = {
+      name: "WUSD Token",
+      symbol: "WUSD",
+      uri: "https://www.stableflow.app/metadata.json",
+    };
+
+    await program.methods
+      .setTokenMetadata(metadata.name, metadata.symbol, metadata.uri)
+      .accounts({
+        authority: minter.publicKey,
+        authorityState: authorityState,
+        metadata: metadataPda,
+        mint: tokenMint.publicKey,
+        payer: minter.publicKey,
+        tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
+        systemProgram: anchor.web3.SystemProgram.programId,
+        rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+      })
+      .signers([minter])
+      .rpc();
+
+    // Verify metadata
+    // 获取元数据账户信息
+    const metadataAccountInfo = await provider.connection.getAccountInfo(
+      metadataPda
+    );
+    assert(metadataAccountInfo !== null, "Metadata account not found");
+    const metadataData = program.coder.accounts.decode(
+      "metadata",
+      metadataAccountInfo.data
+    );
+
+    // 验证元数据
+    assert.equal(metadataData.name, metadata.name, "Name mismatch");
+    assert.equal(metadataData.symbol, metadata.symbol, "Symbol mismatch");
+    assert.equal(metadataData.uri, metadata.uri, "URI mismatch");
   });
 
   it("Transfer WUSD", async () => {

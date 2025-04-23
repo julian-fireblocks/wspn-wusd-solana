@@ -14,6 +14,8 @@
   "dependencies": {
     "@coral-xyz/anchor": "0.28.0",
     "@metaplex-foundation/js": "0.20.1",
+    "@metaplex-foundation/mpl-token-metadata": "^3.4.0",
+    "@metaplex-foundation/umi": "^1.2.0",
     "@solana/spl-token": "0.4.9",
     "@solana/web3.js": "1.77.3",
     "rpc-websockets": "7.5.1"

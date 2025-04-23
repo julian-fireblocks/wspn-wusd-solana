@@ -5,11 +5,11 @@ pub enum WusdError {
     #[msg("Contract is paused")]
     ContractPaused,
     #[msg("Invalid amount")]
-    InvalidAmount,     
+    InvalidAmount,
     #[msg("Unauthorized")]
-    Unauthorized, 
+    Unauthorized,
     #[msg("Insufficient balance")]
-    InsufficientBalance,     
+    InsufficientBalance,
     #[msg("Invalid owner")]
     InvalidOwner,
     #[msg("Insufficient allowance")]
@@ -19,11 +19,17 @@ pub enum WusdError {
     #[msg("Account is already frozen")]
     AccountAlreadyFrozen,
     #[msg("Account is not frozen")]
-    AccountNotFrozen, 
+    AccountNotFrozen,
     #[msg("Invalid mint address")]
-    InvalidMint, 
+    InvalidMint,
     #[msg("Expired approve")]
     ExpiredApprovet,
     #[msg("Invalid address")]
-    InvalidAddress,   
+    InvalidAddress,
+    #[msg("Invalid name")]
+    InvalidName,
+    #[msg("Invalid symbol")]
+    InvalidSymbol,
+    #[msg("Invalid uri")]
+    InvalidUri,
 }

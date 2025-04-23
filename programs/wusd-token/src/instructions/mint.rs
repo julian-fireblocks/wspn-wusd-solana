@@ -1,9 +1,13 @@
 use crate::error::WusdError;
 use crate::state::{AuthorityState, FreezeState, MintState, PauseState};
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::program::invoke_signed;
 use anchor_spl::token_2022::Token2022;
 use anchor_spl::token_2022::{self, mint_to};
+use mpl_token_metadata::instructions as mpl_instruction;
+use mpl_token_metadata::types::DataV2;
 
+/// 创建WUSD代币
 pub fn mint(ctx: Context<MintAccounts>, amount: u64, bump: u8) -> Result<()> {
     // 验证金额有效性
     require!(amount > 0, WusdError::InvalidAmount);
@@ -32,6 +36,79 @@ pub fn mint(ctx: Context<MintAccounts>, amount: u64, bump: u8) -> Result<()> {
         minter: ctx.accounts.authority.key(),
         recipient: ctx.accounts.token_account.owner,
         amount
+    });
+
+    Ok(())
+}
+
+/// 设置代币元数据
+pub fn set_token_metadata(
+    ctx: Context<SetTokenMetadata>,
+    name: String,
+    symbol: String,
+    uri: String,
+) -> Result<()> {
+    // 参数验证
+    require!(!name.is_empty(), WusdError::InvalidName);
+    require!(!symbol.is_empty(), WusdError::InvalidSymbol);
+    require!(!uri.is_empty(), WusdError::InvalidUri);
+
+    let create_metadata_ix = mpl_instruction::CreateMetadataAccountV3 {
+        metadata: ctx.accounts.metadata.key(),
+        mint: ctx.accounts.mint.key(),
+        mint_authority: ctx.accounts.authority_state.key(),
+        payer: ctx.accounts.payer.key(),
+        update_authority: (ctx.accounts.authority_state.key(), true),
+        system_program: ctx.accounts.system_program.key(),
+        rent: Some(ctx.accounts.rent.key()),
+    }
+    .instruction(mpl_instruction::CreateMetadataAccountV3InstructionArgs {
+        data: DataV2 {
+            // 在这里克隆，保留原始变量的所有权
+            name: name.clone(),
+            symbol: symbol.clone(),
+            uri: uri.clone(),
+            seller_fee_basis_points: 0,
+            creators: None,
+            collection: None,
+            uses: None,
+        },
+        is_mutable: false,
+        collection_details: None,
+    });
+
+    // PDA seeds
+    let mint_key = ctx.accounts.mint.key();
+    let seeds = &[
+        b"authority",
+        mint_key.as_ref(),
+        &[ctx.bumps.authority_state],
+    ];
+    let signer_seeds = &[&seeds[..]];
+
+    // 注意：invoke_signed 的 accounts 参数需要匹配 instruction 定义的顺序和类型
+    // 需要根据 mpl_instruction::CreateMetadataAccountV3 的实际账户顺序调整这里的 accounts vector
+    // 修改账户顺序，确保与 Metaplex 程序期望的顺序一致
+    let account_infos = vec![
+        ctx.accounts.metadata.to_account_info(),
+        ctx.accounts.mint.to_account_info(),
+        ctx.accounts.authority_state.to_account_info(),
+        ctx.accounts.payer.to_account_info(),
+        ctx.accounts.system_program.to_account_info(),
+        ctx.accounts.rent.to_account_info(),
+        ctx.accounts.token_metadata_program.to_account_info(),
+    ];
+
+    invoke_signed(&create_metadata_ix, &account_infos, signer_seeds)?;
+
+    // 发出设置元数据事件
+    // 这里的 clone 现在可以正常工作，因为原始变量的所有权还在
+    emit!(SetTokenMetadataEvent {
+        mint: ctx.accounts.mint.key(),
+        name: name.clone(),
+        symbol: symbol.clone(),
+        uri: uri.clone(),
+        setter: ctx.accounts.authority.key(),
     });
 
     Ok(())
@@ -82,4 +159,44 @@ pub struct MintEvent {
     pub recipient: Pubkey,
     /// 铸造数量，被铸造的代币数量
     pub amount: u64,
+}
+
+/// 设置代币元数据事件
+#[event]
+pub struct SetTokenMetadataEvent {
+    /// 代币 Mint 地址
+    pub mint: Pubkey,
+    /// 设置的代币名称
+    pub name: String,
+    /// 设置的代币符号
+    pub symbol: String,
+    /// 设置的代币 URI
+    pub uri: String,
+    /// 执行设置操作的账户
+    pub setter: Pubkey,
+}
+
+#[derive(Accounts)]
+pub struct SetTokenMetadata<'info> {
+    pub authority: Signer<'info>,
+    #[account(
+        seeds = [b"authority", mint.key().as_ref()],
+        bump, 
+        constraint = authority_state.is_minter(authority.key()) @ WusdError::Unauthorized // 假设 is_minter 检查调用者权限
+    )]
+    pub authority_state: Account<'info, AuthorityState>,
+    /// CHECK: Metaplex Metadata PDA - 需要初始化或传入正确的 PDA 地址
+    #[account(mut)]
+    pub metadata: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub mint: InterfaceAccount<'info, anchor_spl::token_interface::Mint>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+    /// CHECK: Rent sysvar
+    #[account(address = anchor_lang::solana_program::sysvar::rent::ID)]
+    pub rent: UncheckedAccount<'info>,
+    /// CHECK: token_metadata_program
+    #[account(address = mpl_token_metadata::ID, executable)]
+    pub token_metadata_program: UncheckedAccount<'info>,
 }
