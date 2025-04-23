@@ -241,9 +241,9 @@ pub struct Initialize<'info> {
         bump
     )]
     pub pause_state: Account<'info, PauseState>,
-    pub system_program: Program<'info, System>,  
-    pub token_program: Program<'info, anchor_spl::token_2022::Token2022>,
     pub rent: Sysvar<'info, Rent>,
+    pub system_program: Program<'info, System>,  
+    pub token_program: Program<'info, anchor_spl::token_2022::Token2022>, 
 }
 
 #[event]

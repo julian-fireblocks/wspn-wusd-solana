@@ -86,17 +86,15 @@ pub fn set_token_metadata(
     ];
     let signer_seeds = &[&seeds[..]];
 
-    // 注意：invoke_signed 的 accounts 参数需要匹配 instruction 定义的顺序和类型
-    // 需要根据 mpl_instruction::CreateMetadataAccountV3 的实际账户顺序调整这里的 accounts vector
-    // 修改账户顺序，确保与 Metaplex 程序期望的顺序一致
+    // 注意：invoke_signed 的 accounts 参数需要匹配 instruction 定义的顺序和类型 
     let account_infos = vec![
         ctx.accounts.metadata.to_account_info(),
         ctx.accounts.mint.to_account_info(),
         ctx.accounts.authority_state.to_account_info(),
         ctx.accounts.payer.to_account_info(),
         ctx.accounts.system_program.to_account_info(),
-        ctx.accounts.rent.to_account_info(),
-        ctx.accounts.token_metadata_program.to_account_info(),
+        ctx.accounts.rent.to_account_info(), 
+        ctx.accounts.token_metadata_program.to_account_info(), 
     ];
 
     invoke_signed(&create_metadata_ix, &account_infos, signer_seeds)?;
@@ -193,9 +191,7 @@ pub struct SetTokenMetadata<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     pub system_program: Program<'info, System>,
-    /// CHECK: Rent sysvar
-    #[account(address = anchor_lang::solana_program::sysvar::rent::ID)]
-    pub rent: UncheckedAccount<'info>,
+    pub rent: Sysvar<'info, Rent>,
     /// CHECK: token_metadata_program
     #[account(address = mpl_token_metadata::ID, executable)]
     pub token_metadata_program: UncheckedAccount<'info>,
