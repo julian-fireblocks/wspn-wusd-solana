@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_2022::{self, Token2022, approve};
 use anchor_spl::token_interface::{Mint, TokenAccount};
 use crate::error::WusdError;  
-use crate::state::{MintState, PermitState, PauseState}; 
+use crate::state::{MintState, ApproveState, PauseState}; 
 /// 处理代表津贴请求，允许代币持有者授权其他账户使用其代币 
 /// 
 /// # 参数
@@ -18,7 +18,7 @@ pub fn approve_set(ctx: Context<Approve>, amount: u64, expiry_time: i64) -> Resu
     
     // 验证过期时间有效性
     let current_time = Clock::get()?.unix_timestamp;
-    require!(expiry_time > current_time, WusdError::ExpiredPermit);
+    require!(expiry_time > current_time, WusdError::ExpiredApprovet);
     
     // 验证mint状态
     require!(
@@ -39,13 +39,13 @@ pub fn approve_set(ctx: Context<Approve>, amount: u64, expiry_time: i64) -> Resu
         amount,
     )?;
     
-    // 初始化 permit_state 用于兼容现有的transfer_from功能
-    ctx.accounts.permit_state.set_inner(PermitState::initialize(
+    // 初始化 approve_state 用于兼容现有的transfer_from功能
+    ctx.accounts.approve_state.set_inner(ApproveState::initialize(
         ctx.accounts.owner.key(),
         ctx.accounts.delegate.key(),
         amount,
         expiry_time,
-        ctx.bumps.permit_state
+        ctx.bumps.approve_state
     ));
     
     // 发出授权代表事件
@@ -78,15 +78,15 @@ pub struct Approve<'info> {
     #[account(
         init_if_needed,
         payer = owner,
-        space = PermitState::SIZE,
+        space = ApproveState::SIZE,
         seeds = [
-            b"permit",
+            b"approve",
             owner.key().as_ref(),
             delegate.key().as_ref()
         ],
         bump,
     )]
-    pub permit_state: Account<'info, PermitState>,
+    pub approve_state: Account<'info, ApproveState>,
 
     pub token_mint: InterfaceAccount<'info, Mint>,
     pub mint_state: Box<Account<'info, MintState>>,

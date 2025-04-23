@@ -14,7 +14,7 @@ pub struct AllowanceState {
 
 /// 签名许可状态账户，用于EIP-2612兼容的签名授权
 #[account]
-pub struct PermitState {
+pub struct ApproveState {
     /// 所有者地址
     pub owner: Pubkey,
     /// 被授权者地址
@@ -29,7 +29,7 @@ pub struct PermitState {
     pub bump: u8,
 }
 
-impl PermitState {
+impl ApproveState {
     /// 许可状态账户大小
     pub const SIZE: usize = 8 + 32 + 32 + 8 + 8 + 8 + 1;
 

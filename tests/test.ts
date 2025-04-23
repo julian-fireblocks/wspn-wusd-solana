@@ -485,10 +485,10 @@ describe("wusd-token", () => {
       .signers([admin])
       .rpc();
 
-    // 创建permit_state账户
-    const [permitState] = await anchor.web3.PublicKey.findProgramAddress(
+    // 创建approve_state账户
+    const [approveState] = await anchor.web3.PublicKey.findProgramAddress(
       [
-        Buffer.from("permit"),
+        Buffer.from("approve"),
         recipient.publicKey.toBuffer(),
         delegate.publicKey.toBuffer(),
       ],
@@ -506,7 +506,7 @@ describe("wusd-token", () => {
         owner: recipient.publicKey,
         delegate: delegate.publicKey,
         tokenAccount: recipientTokenAccount,
-        permitState: permitState,
+        approveState: approveState,
         tokenMint: tokenMint.publicKey,
         mintState: mintState,
         pauseState: pauseState,
@@ -528,7 +528,7 @@ describe("wusd-token", () => {
         tokenMint: tokenMint.publicKey,
         mintState: mintState,
         pauseState: pauseState,
-        permit: permitState,
+        approve: approveState,
         fromFreezeState: freezeState,
         toFreezeState: transferFreezeState,
         tokenProgram: TOKEN_2022_PROGRAM_ID,
