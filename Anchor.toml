@@ -2,11 +2,11 @@
 anchor_version = "0.29.0"
 
 [features]
-seeds = false
+resolution = true
 skip-lint = false
 
 [programs.devnet]
-wusd_token = "F8bssPyuN6H4HoJtWRW4koomPiLnr8hgAeQaQW9yiRER"
+wusd_token = "GXtsGhmGUz4uFkCxsNSmJaxU9nr6SvgA3c6pxFc2MpPn"
 
 [registry]
 url = "https://api.apr.dev"
