@@ -13,7 +13,7 @@ export ANCHOR_PROVIDER_URL="https://api.devnet.solana.com"
 export ANCHOR_WALLET="./deploy-keypair.json"
 
 # 设置程序ID和文件路径
-PROGRAM_ID="F8bssPyuN6H4HoJtWRW4koomPiLnr8hgAeQaQW9yiRER"
+PROGRAM_ID="HrkSbtcCVsWJ1dpRKS7rNgwrga74XR7izJWn59BVWKbG"
 PROGRAM_SO="target/deploy/wusd_token.so"
 KEYPAIR="./deploy-keypair.json"
 

@@ -1,4 +1,11 @@
 #!/bin/bash
+###
+ # @Author: 李志刚
+ # @Date: 2025-04-24 15:52:39
+ # @LastEditors: 李志刚
+ # @LastEditTime: 2025-04-24 20:14:17
+ # @Description: 
+### 
 
 # 这个脚本使用拆分流程部署，先创建缓冲区，然后部署程序
 

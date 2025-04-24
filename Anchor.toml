@@ -6,7 +6,7 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-wusd_token = "GXtsGhmGUz4uFkCxsNSmJaxU9nr6SvgA3c6pxFc2MpPn"
+wusd_token = "HrkSbtcCVsWJ1dpRKS7rNgwrga74XR7izJWn59BVWKbG"
 
 [registry]
 url = "https://api.apr.dev"
