@@ -25,11 +25,5 @@ pub enum WusdError {
     #[msg("Expired approve")]
     ExpiredApprovet,
     #[msg("Invalid address")]
-    InvalidAddress,
-    #[msg("Invalid name")]
-    InvalidName,
-    #[msg("Invalid symbol")]
-    InvalidSymbol,
-    #[msg("Invalid uri")]
-    InvalidUri,
+    InvalidAddress, 
 }

@@ -140,12 +140,7 @@ pub mod wusd_token {
     /// 铸造WUSD代币 
     pub fn mint(ctx: Context<MintAccounts>, amount: u64, bump: u8) -> Result<()> {
         instructions::mint::mint(ctx, amount, bump) 
-    }
-
-    /// 设置代币元数据 
-    pub fn set_token_metadata(ctx: Context<SetTokenMetadata>, name: String, symbol: String, uri: String,) -> Result<()> {
-        instructions::mint::set_token_metadata(ctx, name, symbol, uri) 
-    }
+    } 
     
     /// 处理代表津贴请求，允许代币持有者授权其他账户使用其代币 
     pub fn approve(ctx: Context<Approve>, amount: u64, expiry_time: i64) -> Result<()> { 
