@@ -6,16 +6,18 @@
     "localnet": "solana-test-validator",
     "clean": "cargo clean",
     "test": "dotenv -e .env yarn token_test --verbose",
-    "re_test": "yarn build && yarn deploy && yarn test",
+    "re_test": "yarn build && yarn deploy && yarn test", 
     "token_test": "ts-mocha -p ./tsconfig.json -t 1000000 tests/test.ts --trace-warnings --full-trace",
     "build": "anchor build",
-    "deploy": "anchor deploy" 
+    "deploy": "anchor deploy"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "0.28.0",
-    "@metaplex-foundation/js": "0.20.1",
-    "@metaplex-foundation/mpl-token-metadata": "^3.4.0",
-    "@metaplex-foundation/umi": "^1.2.0",
+    "@coral-xyz/anchor": "^0.29.0",
+    "@metaplex-foundation/js": "^0.20.1",
+    "@metaplex-foundation/mpl-token-metadata": "3.4.0",
+    "@metaplex-foundation/umi": "0.9.1",
+    "@metaplex-foundation/umi-bundle-defaults": "0.9.1",
+    "@metaplex-foundation/umi-web3js-adapters": "0.9.1",
     "@solana/spl-token": "0.4.9",
     "@solana/web3.js": "1.77.3",
     "rpc-websockets": "7.5.1"
