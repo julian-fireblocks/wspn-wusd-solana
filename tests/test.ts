@@ -159,13 +159,7 @@ describe("wusd-token", () => {
         TOKEN_2022_PROGRAM_ID
       );
       console.log("使用已存在的tokenMint:", tokenMint.publicKey.toBase58());
-      console.log("当前mint authority:", mintInfo.mintAuthority?.toBase58());
-      
-      // 检查mint authority是否正确
-      if (!mintInfo.mintAuthority?.equals(admin.publicKey)) {
-        console.log("Mint authority不是admin，但无法重新创建已存在的账户。");
-        console.log("测试可能会失败，请考虑使用不同的mint地址。");
-      }
+      console.log("当前mint authority:", mintInfo.mintAuthority?.toBase58()); 
     } catch (e) {
       // mint不存在，创建新的
       console.log("TokenMint不存在，创建新的...");
@@ -182,9 +176,7 @@ describe("wusd-token", () => {
         );
         console.log("TokenMint创建成功:", tokenMint.publicKey.toBase58());
       } catch (e) {
-        console.error("创建TokenMint失败:", e);
-        console.log("可能是TokenMint已存在但无法访问，或者创建过程中出错");
-        console.log("测试可能会失败，请考虑使用不同的mint地址。");
+        console.error("创建TokenMint失败:", e.message); 
       }
       
       // 等待mint完全初始化
@@ -743,7 +735,7 @@ describe("wusd-token", () => {
     console.log("Transfer completed successfully");
   });
 
-  it("Approve Transfer WUSD", async () => {
+  it("Approve And Transfer WUSD", async () => {
     // 确保合约已初始化
     if (!(await ensureContractInitialized("Approve Transfer WUSD"))) {
       return;
