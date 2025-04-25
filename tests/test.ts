@@ -3,8 +3,7 @@ import { Program } from "@coral-xyz/anchor";
 import { WusdToken } from "../target/types/wusd_token";
 import * as spl from "@solana/spl-token";
 import { TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
-import { assert } from "chai";
-import { MPL_TOKEN_METADATA_PROGRAM_ID } from "@metaplex-foundation/mpl-token-metadata";
+import { assert } from "chai"; 
 import { keypairManager } from "./keypairs";
 import { ensureAccountBalance, createTokenAccount } from "./utils"; 
 
@@ -53,11 +52,7 @@ describe("wusd-token", () => {
   // 从deploy-keypair.json导入本地账号
   let localWallet: anchor.web3.Keypair;
   // 最小转账金额(0.1 SOL，足够支持基本交易)
-  const MIN_ACCOUNT_BALANCE = 0.1;
-  const TOKEN_METADATA_PROGRAM_ID = new anchor.web3.PublicKey(
-    MPL_TOKEN_METADATA_PROGRAM_ID
-  );
-
+  const MIN_ACCOUNT_BALANCE = 0.1; 
   // 共享变量
   const decimals = 9;
   const tokenMint = keypairManager.getOrCreate("tokenMint");

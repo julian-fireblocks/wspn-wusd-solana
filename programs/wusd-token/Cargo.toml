@@ -22,9 +22,4 @@ spl-token-2022 = { version = "0.9.0" }
 anchor-spl = { version = "0.29.0", features = ["token", "associated_token", "spl-token-2022", "token_2022"] }
 solana-program = "=1.18.16" 
 
-[profile.release]
-opt-level = 3
-overflow-checks = true
-lto = "fat"
-codegen-units = 1
-panic = "abort" 
+ 
