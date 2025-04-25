@@ -6,7 +6,7 @@ import { TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 import { assert } from "chai";
 import { MPL_TOKEN_METADATA_PROGRAM_ID } from "@metaplex-foundation/mpl-token-metadata";
 import { keypairManager } from "./keypairs";
-import { ensureAccountBalance, createTokenAccount } from "./utils";
+import { ensureAccountBalance, createTokenAccount } from "./utils"; 
 
 describe("wusd-token", () => {
   const provider = anchor.AnchorProvider.env();
@@ -67,8 +67,7 @@ describe("wusd-token", () => {
   let mintState: anchor.web3.PublicKey;
   let pauseState: anchor.web3.PublicKey;
   let freezeState: anchor.web3.PublicKey;
-  let authorityBump: number;
-  let metadataPda: anchor.web3.PublicKey;
+  let authorityBump: number; 
 
   // 辅助函数：安全地初始化freezeState账户
   async function safeInitializeFreezeState(
@@ -197,16 +196,8 @@ describe("wusd-token", () => {
     [pauseState] = await anchor.web3.PublicKey.findProgramAddress(
       [Buffer.from("pause_state"), tokenMint.publicKey.toBuffer()],
       program.programId
-    );
+    ); 
     
-    [metadataPda] = anchor.web3.PublicKey.findProgramAddressSync(
-      [
-        Buffer.from("metadata"),
-        TOKEN_METADATA_PROGRAM_ID.toBuffer(),
-        tokenMint.publicKey.toBuffer(),
-      ],
-      TOKEN_METADATA_PROGRAM_ID
-    );
   });
 
   // 删除resetTests函数，改为修改ensureContractInitialized函数
@@ -1021,5 +1012,6 @@ describe("wusd-token", () => {
     const finalBalance = parseFloat(new anchor.BN(afterBurnBalance.amount.toString()).toString()) / (10 ** decimals);
     console.log("销毁后销毁账户余额:", finalBalance, "WUSD");
     console.log("Burn completed successfully");
-  });
+  });  
+   
 });

@@ -3,7 +3,7 @@ import * as spl from "@solana/spl-token";
 import { TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 
 // 最小SOL金额
-export const MIN_SOL_BALANCE = 0.3; // 0.3 SOL
+export const MIN_SOL_BALANCE = 0.2; // 0.2 SOL
 
 // 转账SOL给指定账户
 export async function fundAccount(
@@ -117,4 +117,6 @@ export async function waitForConfirmation(
   confirmationLevel: anchor.web3.Finality = "confirmed"
 ): Promise<void> {
   await connection.confirmTransaction(signature, confirmationLevel);
-} 
+}
+
+ 
