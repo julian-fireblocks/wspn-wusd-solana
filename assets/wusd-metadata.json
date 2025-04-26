@@ -1,5 +1,5 @@
 {
-  "name": "WUSD Token",
+  "name": "WUSD Stablecoin",
   "symbol": "WUSD",
   "description": "WSPN USD Stablecoin on Solana",
   "image": "https://www.stableflow.app/images/WUSD.png",
@@ -12,6 +12,14 @@
     {
       "trait_type": "Network",
       "value": "Solana"
+    },
+    {
+      "trait_type": "Decimals",
+      "value": "9"
+    },
+    {
+      "trait_type": "Issuer",
+      "value": "WSPN DAO"
     }
   ]
 }

@@ -19,6 +19,7 @@
     "@metaplex-foundation/umi-bundle-defaults": "^0.9.1",
     "@metaplex-foundation/umi-web3js-adapters": "0.9.1",
     "@solana/spl-token": "0.4.9",
+    "@solana/spl-token-metadata": "^0.1.6",
     "@solana/web3.js": "1.77.3",
     "rpc-websockets": "7.5.1"
   },
