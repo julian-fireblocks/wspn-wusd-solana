@@ -1,12 +1,13 @@
-import * as anchor from "@coral-xyz/anchor";
-import { Program } from "@coral-xyz/anchor";
-import { WusdToken } from "../target/types/wusd_token";
+import * as anchor from "@coral-xyz/anchor"; 
 import * as spl from "@solana/spl-token";
 import { TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
-import { assert } from "chai"; 
+import { assert } from "chai";
 import { keypairManager } from "./keypairs";
 import { ensureAccountBalance, createTokenAccount } from "./utils"; 
+import dotenv from "dotenv";
 
+// 加载环境变量
+dotenv.config(); 
 describe("wusd-token", () => {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
@@ -26,11 +27,11 @@ describe("wusd-token", () => {
 
   // 从本地构建的keypair读取程序ID
   let programId: anchor.web3.PublicKey;
-  let program: Program<WusdToken>;
+  let program: any;
 
   try {
     // 首先尝试使用workspace获取程序
-    program = anchor.workspace.WusdToken as Program<WusdToken>;
+    program = anchor.workspace.WusdToken;
     programId = program.programId;
   } catch (e) {
     // 如果失败，从构建的keypair文件获取
@@ -46,13 +47,13 @@ describe("wusd-token", () => {
       idl,
       programId,
       provider
-    ) as Program<WusdToken>;
+    );
   }
 
   // 从deploy-keypair.json导入本地账号
   let localWallet: anchor.web3.Keypair;
   // 最小转账金额(0.1 SOL，足够支持基本交易)
-  const MIN_ACCOUNT_BALANCE = 0.1; 
+  const MIN_ACCOUNT_BALANCE = 0.1;
   // 共享变量
   const decimals = 9;
   const tokenMint = keypairManager.getOrCreate("tokenMint");
@@ -61,8 +62,7 @@ describe("wusd-token", () => {
   let authorityState: anchor.web3.PublicKey;
   let mintState: anchor.web3.PublicKey;
   let pauseState: anchor.web3.PublicKey;
-  let freezeState: anchor.web3.PublicKey;
-  let authorityBump: number; 
+  let freezeState: anchor.web3.PublicKey; 
 
   // 辅助函数：安全地初始化freezeState账户
   async function safeInitializeFreezeState(
@@ -143,7 +143,7 @@ describe("wusd-token", () => {
       admin.publicKey,
       1 // 1 SOL应该足够支付创建token mint和其他账户的租金
     );
-    
+
     // 检查tokenMint是否已经存在
     try {
       const mintInfo = await spl.getMint(
@@ -153,7 +153,7 @@ describe("wusd-token", () => {
         TOKEN_2022_PROGRAM_ID
       );
       console.log("使用已存在的tokenMint:", tokenMint.publicKey.toBase58());
-      console.log("当前mint authority:", mintInfo.mintAuthority?.toBase58()); 
+      console.log("当前mint authority:", mintInfo.mintAuthority?.toBase58());
     } catch (e) {
       // mint不存在，创建新的
       console.log("TokenMint不存在，创建新的...");
@@ -170,39 +170,42 @@ describe("wusd-token", () => {
         );
         console.log("TokenMint创建成功:", tokenMint.publicKey.toBase58());
       } catch (e) {
-        console.error("创建TokenMint失败:", e.message); 
+        console.error("创建TokenMint失败:", e.message);
       }
-      
+
       // 等待mint完全初始化
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
     }
-    
+
     // 预先计算所有PDA
-    [authorityState, authorityBump] = await anchor.web3.PublicKey.findProgramAddress(
-      [Buffer.from("authority"), tokenMint.publicKey.toBuffer()],
-      program.programId
-    );
-    
+    [authorityState] =
+      await anchor.web3.PublicKey.findProgramAddress(
+        [Buffer.from("authority"), tokenMint.publicKey.toBuffer()],
+        program.programId
+      );
+
     [mintState] = await anchor.web3.PublicKey.findProgramAddress(
       [Buffer.from("mint_state"), tokenMint.publicKey.toBuffer()],
       program.programId
     );
-    
+
     [pauseState] = await anchor.web3.PublicKey.findProgramAddress(
       [Buffer.from("pause_state"), tokenMint.publicKey.toBuffer()],
       program.programId
-    ); 
-    
+    );
   });
 
   // 删除resetTests函数，改为修改ensureContractInitialized函数
-  async function ensureContractInitialized(testName: string, shouldSkip: boolean = false): Promise<boolean> {
+  async function ensureContractInitialized(
+    testName: string,
+    shouldSkip: boolean = false
+  ): Promise<boolean> {
     try {
       await program.account.authorityState.fetch(authorityState);
       return true; // 合约已初始化
     } catch (e) {
       console.log("合约未初始化，尝试初始化...");
-      
+
       // 检查mint authority是否正确
       try {
         const mintInfo = await spl.getMint(
@@ -211,7 +214,7 @@ describe("wusd-token", () => {
           "confirmed",
           TOKEN_2022_PROGRAM_ID
         );
-        
+
         if (!mintInfo.mintAuthority?.equals(admin.publicKey)) {
           console.error("TokenMint的mint authority不是admin，合约无法初始化");
           if (shouldSkip) {
@@ -226,7 +229,7 @@ describe("wusd-token", () => {
         }
         return false;
       }
-      
+
       try {
         await program.methods
           .initialize(decimals)
@@ -256,9 +259,9 @@ describe("wusd-token", () => {
     }
   }
 
-  it("Initialize Contract", async () => { 
+  it("Initialize Contract", async () => {
     console.log("ProgramId", program.programId.toBase58());
-    
+
     // 创建接收者的token账户
     recipientTokenAccount = await createTokenAccount(
       provider.connection,
@@ -266,7 +269,7 @@ describe("wusd-token", () => {
       tokenMint.publicKey,
       admin.publicKey
     );
-    
+
     // 查找freeze_state账户地址
     const [freezeStateAddress] = await anchor.web3.PublicKey.findProgramAddress(
       [
@@ -379,7 +382,7 @@ describe("wusd-token", () => {
       localWallet,
       recipient.publicKey,
       MIN_ACCOUNT_BALANCE
-    ); 
+    );
 
     // 创建接收者的token账户
     recipientTokenAccount = await createTokenAccount(
@@ -399,18 +402,21 @@ describe("wusd-token", () => {
         TOKEN_2022_PROGRAM_ID
       );
       // 使用字符串方式处理金额，避免数字溢出
-      const beforeMintAmountBN = new anchor.BN(beforeMintAccountInfo.amount.toString());
-      beforeMintBalance = parseFloat(beforeMintAmountBN.toString()) / (10 ** decimals);
+      const beforeMintAmountBN = new anchor.BN(
+        beforeMintAccountInfo.amount.toString()
+      );
+      beforeMintBalance =
+        parseFloat(beforeMintAmountBN.toString()) / 10 ** decimals;
     } catch (e) {
       // 如果账户不存在或余额为0，设为0
       beforeMintBalance = 0;
     }
-    
+
     console.log("铸币前接收账户余额:", beforeMintBalance, "WUSD");
-    
+
     // 正确显示带小数的铸币金额
     // 使用字符串方式处理金额，避免数字溢出
-    const mintWUSD = parseFloat(amount.toString()) / (10 ** decimals);
+    const mintWUSD = parseFloat(amount.toString()) / 10 ** decimals;
     console.log("计划铸币金额:", mintWUSD, "WUSD");
 
     // 使用辅助函数安全初始化freezeState
@@ -420,8 +426,8 @@ describe("wusd-token", () => {
     const [_, correctBump] = await anchor.web3.PublicKey.findProgramAddress(
       [Buffer.from("authority"), tokenMint.publicKey.toBuffer()],
       program.programId
-    );  
-    
+    );
+
     try {
       await program.methods
         .mint(amount, correctBump)
@@ -454,13 +460,13 @@ describe("wusd-token", () => {
     // 将实际铸币数量转换为WUSD单位
     const mintedAmount = new anchor.BN(tokenAccountInfo.amount.toString());
     // 使用字符串方式处理金额，避免数字溢出
-    const mintedWUSD = parseFloat(mintedAmount.toString()) / (10 ** decimals);
+    const mintedWUSD = parseFloat(mintedAmount.toString()) / 10 ** decimals;
     console.log("铸币后账户余额:", mintedWUSD, "WUSD");
     console.log("Mint completed successfully");
 
     // 修改断言，账户金额应至少等于我们铸造的金额
     assert(mintedAmount.gte(amount), "Amount too small");
-  }); 
+  });
 
   it("Transfer WUSD", async () => {
     // 确保合约已初始化
@@ -504,14 +510,22 @@ describe("wusd-token", () => {
     );
 
     // 正确显示带小数的余额，使用字符串方式避免数字溢出
-    const beforeFromBalance = parseFloat(new anchor.BN(beforeFromTokenAccountInfo.amount.toString()).toString()) / (10 ** decimals);
-    const beforeToBalance = parseFloat(new anchor.BN(beforeToTokenAccountInfo.amount.toString()).toString()) / (10 ** decimals);
-    
+    const beforeFromBalance =
+      parseFloat(
+        new anchor.BN(beforeFromTokenAccountInfo.amount.toString()).toString()
+      ) /
+      10 ** decimals;
+    const beforeToBalance =
+      parseFloat(
+        new anchor.BN(beforeToTokenAccountInfo.amount.toString()).toString()
+      ) /
+      10 ** decimals;
+
     console.log("转账前发送方余额:", beforeFromBalance, "WUSD");
     console.log("转账前接收方余额:", beforeToBalance, "WUSD");
-    
+
     // 正确显示带小数的金额，使用字符串方式避免数字溢出
-    const transferWUSD = parseFloat(transferAmount.toString()) / (10 ** decimals);
+    const transferWUSD = parseFloat(transferAmount.toString()) / 10 ** decimals;
     console.log("计划转账金额:", transferWUSD, "WUSD");
 
     // 使用辅助函数安全初始化目标账户的freezeState
@@ -605,8 +619,9 @@ describe("wusd-token", () => {
     const actualToBalance = new anchor.BN(toTokenAccountInfo.amount.toString());
 
     // 输出转账后的账户余额，使用字符串方式避免数字溢出
-    const fromBalance = parseFloat(actualFromBalance.toString()) / (10 ** decimals);
-    const toBalance = parseFloat(actualToBalance.toString()) / (10 ** decimals);
+    const fromBalance =
+      parseFloat(actualFromBalance.toString()) / 10 ** decimals;
+    const toBalance = parseFloat(actualToBalance.toString()) / 10 ** decimals;
     console.log("转账后发送方余额:", fromBalance, "WUSD");
     console.log("转账后接收方余额:", toBalance, "WUSD");
     console.log("Transfer completed successfully");
@@ -659,14 +674,22 @@ describe("wusd-token", () => {
     );
 
     // 正确显示带小数的余额，使用字符串方式避免数字溢出
-    const beforeFromBalance = parseFloat(new anchor.BN(beforeFromTokenAccountInfo.amount.toString()).toString()) / (10 ** decimals);
-    const beforeToBalance = parseFloat(new anchor.BN(beforeToTokenAccountInfo.amount.toString()).toString()) / (10 ** decimals);
-    
+    const beforeFromBalance =
+      parseFloat(
+        new anchor.BN(beforeFromTokenAccountInfo.amount.toString()).toString()
+      ) /
+      10 ** decimals;
+    const beforeToBalance =
+      parseFloat(
+        new anchor.BN(beforeToTokenAccountInfo.amount.toString()).toString()
+      ) /
+      10 ** decimals;
+
     console.log("授权转账前，发送方余额:", beforeFromBalance, "WUSD");
     console.log("授权转账前，接收方余额:", beforeToBalance, "WUSD");
-    
+
     // 正确显示带小数的转账金额，使用字符串方式避免数字溢出
-    const transferWUSD = parseFloat(transferAmount.toString()) / (10 ** decimals);
+    const transferWUSD = parseFloat(transferAmount.toString()) / 10 ** decimals;
     console.log("计划授权转账金额:", transferWUSD, "WUSD");
 
     // 使用辅助函数初始化FreezeState账户
@@ -787,13 +810,10 @@ describe("wusd-token", () => {
     assert(actualToBalance.gte(transferAmount), "To account amount too small");
 
     // 输出转账后的账户余额，使用字符串方式避免数字溢出
-    const fromBalance = parseFloat(actualFromBalance.toString()) / (10 ** decimals);
-    const toBalance = parseFloat(actualToBalance.toString()) / (10 ** decimals);
-    console.log(
-      "授权转账后，拥有者余额:",
-      fromBalance,
-      "WUSD"
-    );
+    const fromBalance =
+      parseFloat(actualFromBalance.toString()) / 10 ** decimals;
+    const toBalance = parseFloat(actualToBalance.toString()) / 10 ** decimals;
+    console.log("授权转账后，拥有者余额:", fromBalance, "WUSD");
     console.log("授权转账后，接收方余额:", toBalance, "WUSD");
     console.log("Approve Transfer completed successfully");
   });
@@ -881,10 +901,12 @@ describe("wusd-token", () => {
       undefined,
       TOKEN_2022_PROGRAM_ID
     );
-    
+
     // 如果账户余额为0，则先从recipient账户转账一些token过来
     let burnAmount: anchor.BN;
-    if (new anchor.BN(beforeBurnBalance.amount.toString()).eq(new anchor.BN(0))) {
+    if (
+      new anchor.BN(beforeBurnBalance.amount.toString()).eq(new anchor.BN(0))
+    ) {
       // 创建一个transfer指令从recipient账户转账到burner账户
       // 转账1888.8 WUSD = 1888.8 * 10^9
       const transferAmount = new anchor.BN(1888800000000); // 1888.8 WUSD
@@ -907,10 +929,11 @@ describe("wusd-token", () => {
           // 尝试mint更多代币到recipient账户
           try {
             // 获取正确的authorityBump
-            const [_, mintBump] = await anchor.web3.PublicKey.findProgramAddress(
-              [Buffer.from("authority"), tokenMint.publicKey.toBuffer()],
-              program.programId
-            );
+            const [_, mintBump] =
+              await anchor.web3.PublicKey.findProgramAddress(
+                [Buffer.from("authority"), tokenMint.publicKey.toBuffer()],
+                program.programId
+              );
 
             await program.methods
               .mint(new anchor.BN(2000000000000), mintBump) // 2000 WUSD，确保足够
@@ -967,9 +990,9 @@ describe("wusd-token", () => {
       // 账户余额不为0，使用当前余额
       burnAmount = new anchor.BN(beforeBurnBalance.amount.toString());
     }
-    
+
     // 输出burn前的账户余额，使用字符串方式避免数字溢出
-    const burnWUSD = parseFloat(burnAmount.toString()) / (10 ** decimals);
+    const burnWUSD = parseFloat(burnAmount.toString()) / 10 ** decimals;
     console.log("销毁前销毁账户余额:", burnWUSD, "WUSD");
 
     // 执行burn操作
@@ -1004,9 +1027,10 @@ describe("wusd-token", () => {
     );
 
     // 输出burn后的账户余额，使用字符串方式避免数字溢出
-    const finalBalance = parseFloat(new anchor.BN(afterBurnBalance.amount.toString()).toString()) / (10 ** decimals);
+    const finalBalance =
+      parseFloat(new anchor.BN(afterBurnBalance.amount.toString()).toString()) /
+      10 ** decimals;
     console.log("销毁后销毁账户余额:", finalBalance, "WUSD");
     console.log("Burn completed successfully");
-  });  
-   
+  });
 });
