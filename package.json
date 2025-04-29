@@ -10,6 +10,7 @@
     "token_test": "ts-mocha -p ./tsconfig.json -t 1000000 tests/test.ts --trace-warnings --full-trace --transpile-only",
     "build": "anchor build",
     "deploy": "ts-node scripts/deploy.ts",
+    "mint": "ts-node scripts/mintToken.ts",
     "initca": "ts-node scripts/initContract.ts"
   },
   "dependencies": {

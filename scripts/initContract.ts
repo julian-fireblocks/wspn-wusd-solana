@@ -112,13 +112,17 @@ const InitContract = async () => {
     console.log("Authority state:", authorityState.toBase58());
     console.log("Mint state:", mintState.toBase58());
     console.log("Pause state:", pauseState.toBase58());
-    const targetAccount = Keypair.generate(); 
+    const adminAccount = Keypair.generate();
+    fs.writeFileSync(
+      "./adminAccount.json",
+      JSON.stringify(Array.from(adminAccount.secretKey))
+    );
     // 创建交易
     const initTx = new Transaction().add(
       await program.methods
         .initialize(decimals)
         .accounts({
-          authority: admin,
+          authority: adminAccount.publicKey,
           minter: minterPublicKey,
           pauser: pauserPublicKey,
           tokenMint: tokenMint,
@@ -129,12 +133,12 @@ const InitContract = async () => {
           systemProgram: anchor.web3.SystemProgram.programId,
           rent: anchor.web3.SYSVAR_RENT_PUBKEY,
         })
-        .signers([admin])
+        .signers([adminAccount])
         .instruction()
     );
     initTx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
     initTx.feePayer = admin;
-    initTx.partialSign(targetAccount);
+    initTx.partialSign(adminAccount);
     const hash = await sendAndConfirmTransaction(connection, initTx, []);
     console.log(
       `Init contract: https://explorer.solana.com/tx/${hash}?cluster=devnet`
