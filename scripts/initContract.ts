@@ -122,7 +122,7 @@ const InitContract = async () => {
       await program.methods
         .initialize(decimals)
         .accounts({
-          authority: adminAccount.publicKey,
+          authority: admin,
           minter: minterPublicKey,
           pauser: pauserPublicKey,
           tokenMint: tokenMint,
@@ -133,12 +133,11 @@ const InitContract = async () => {
           systemProgram: anchor.web3.SystemProgram.programId,
           rent: anchor.web3.SYSVAR_RENT_PUBKEY,
         })
-        .signers([adminAccount])
+        .signers([admin])
         .instruction()
     );
     initTx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
     initTx.feePayer = admin;
-    initTx.partialSign(adminAccount);
     const hash = await sendAndConfirmTransaction(connection, initTx, []);
     console.log(
       `Init contract: https://explorer.solana.com/tx/${hash}?cluster=devnet`
