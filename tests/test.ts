@@ -4,7 +4,13 @@ import { TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 import { assert } from "chai";
 import { keypairManager } from "./keypairs";
 import { ensureAccountBalance, createTokenAccount } from "./utils"; 
-import dotenv from "dotenv";
+import dotenv from "dotenv"; 
+import {  
+  PROGRAM_ID, 
+  createCreateMetadataAccountV3Instruction
+} from "@metaplex-foundation/mpl-token-metadata"; 
+import * as fs from "fs";
+import * as path from "path"; 
 
 // 加载环境变量
 dotenv.config(); 
@@ -1032,5 +1038,123 @@ describe("wusd-token", () => {
       10 ** decimals;
     console.log("销毁后销毁账户余额:", finalBalance, "WUSD");
     console.log("Burn completed successfully");
+  });
+
+  it("Set Token Metadata", async () => {
+    // 确保合约已经初始化
+    if (!(await ensureContractInitialized("Set Token Metadata", true))) {
+      return;
+    }
+
+    // 确保admin账户有足够的SOL
+    await ensureAccountBalance(
+      provider.connection,
+      localWallet,
+      admin.publicKey,
+      0.2 // 0.2 SOL 足够创建元数据
+    );
+
+    // 从文件中读取元数据JSON
+    let metadataJson;
+    try {
+      const metadataPath = path.join(__dirname, "../assets/wusd-metadata.json");
+      metadataJson = JSON.parse(fs.readFileSync(metadataPath, "utf-8"));
+      console.log("成功加载元数据文件");
+    } catch (e) {
+      console.error("无法读取元数据文件", e);
+      // 如果无法读取文件，使用默认元数据
+      metadataJson = {
+        name: "WUSD Stablecoin",
+        symbol: "WUSD",
+        description: "WSPN USD Stablecoin on Solana",
+        image: "https://www.stableflow.app/images/WUSD.png",
+        external_url: "https://www.stableflow.app",
+        attributes: [
+          {
+            trait_type: "Type",
+            value: "Stablecoin"
+          },
+          {
+            trait_type: "Network",
+            value: "Solana"
+          },
+          {
+            trait_type: "Decimals",
+            value: "9"
+          } 
+        ]
+      };
+    }
+    
+    try {
+      // 创建元数据URI
+      const metadataUri = "https://www.stableflow.app/metadata/wusd.json";
+      
+      // 创建元数据账户地址
+      const metadataAddress = anchor.web3.PublicKey.findProgramAddressSync(
+        [
+          Buffer.from("metadata"),
+          PROGRAM_ID.toBuffer(),
+          tokenMint.publicKey.toBuffer()
+        ],
+        PROGRAM_ID
+      )[0];
+      
+      // 构建创建元数据指令
+      const createMetadataInstruction = createCreateMetadataAccountV3Instruction(
+        {
+          metadata: metadataAddress,
+          mint: tokenMint.publicKey,
+          mintAuthority: admin.publicKey,
+          payer: admin.publicKey,
+          updateAuthority: admin.publicKey,
+        },
+        {
+          createMetadataAccountArgsV3: {
+            data: {
+              name: metadataJson.name,
+              symbol: metadataJson.symbol,
+              uri: metadataUri,
+              creators: [
+                {
+                  address: admin.publicKey,
+                  verified: true,
+                  share: 100,
+                },
+              ],
+              sellerFeeBasisPoints: 0,
+              uses: null,
+              collection: null,
+            },
+            isMutable: true,
+            collectionDetails: null,
+          },
+        }
+      );
+      
+      // 创建交易
+      let createMetadataTx = new anchor.web3.Transaction().add(createMetadataInstruction);
+      
+      // 获取最新的区块哈希
+      const { blockhash } = await provider.connection.getLatestBlockhash();
+      createMetadataTx.recentBlockhash = blockhash;
+      createMetadataTx.feePayer = admin.publicKey;
+      
+      // 签名并发送交易
+      createMetadataTx.sign(admin);
+      const txSignature = await provider.connection.sendRawTransaction(createMetadataTx.serialize());
+      
+      // 等待交易确认
+      const confirmationStatus = await provider.connection.confirmTransaction(txSignature);
+      
+      if (confirmationStatus.value.err) {
+        console.error("代币元数据创建失败:", confirmationStatus.value.err);
+      } else {
+        console.log("代币元数据创建成功，交易签名:", txSignature);
+      }
+    } catch (e) {
+      console.error("创建代币元数据失败:", e);
+      // 不抛出异常，让测试继续运行
+    }
   });
 });

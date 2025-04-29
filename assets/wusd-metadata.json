@@ -16,10 +16,6 @@
     {
       "trait_type": "Decimals",
       "value": "9"
-    },
-    {
-      "trait_type": "Issuer",
-      "value": "WSPN DAO"
-    }
+    } 
   ]
 }
